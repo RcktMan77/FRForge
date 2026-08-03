@@ -41,6 +41,9 @@ include("capturing/PerssonAV.jl")
 # Register Persson after type is defined
 register_method!("persson_av", (; kwargs...) -> PerssonAVMethod(; kwargs...))
 
+# Agent methods live only under src/methods/
+include("methods/Registry.jl")
+
 # --- Residual + time ---
 include("fr/Residual.jl")
 include("time/SSP_RK3.jl")
@@ -52,6 +55,11 @@ include("verification/ExactSod.jl")
 include("verification/Scoring.jl")
 include("verification/Cases.jl")
 include("verification/Report.jl")
+
+# --- Invention loop ---
+include("invent/Experiment.jl")
+include("invent/Candidate.jl")
+include("invent/Invent.jl")
 
 # --- CLI ---
 include("cli/main.jl")
@@ -103,5 +111,10 @@ export SodProblem, sod_exact, sod_exact_conserved
 export score_suite_absolute, apply_scores!, collect_hard_gate_failures
 export sample_solution_1d, shock_thickness_sp, excess_dissipation, smooth_region_mask
 export observed_orders, order_pass, solution_extrema, overshoot_metric
+
+export list_methods, describe_methods, ScaledPerssonMethod
+export invent_method, score_reports, run_method_report, write_report
+export classify_candidate, print_candidate_summary, score_suite_relative
+export tradeoff_ok, DEFAULT_SCORE_MARGIN
 
 end # module
