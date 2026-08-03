@@ -52,8 +52,11 @@ end
 """
     residual!(du, state::SolutionState2D, eq, method)
 
-2D strong-form FR residual (tensor product). Capturing AV hooks are no-ops for
-NullCapturing; Persson AV is 1D-only in M8 (not applied in 2D).
+2D strong-form FR residual (tensor product) with staged capturing hooks:
+preprocess → face traces / numerical flux → volume FR → sense + dissipate.
+
+Hooks dispatch on `AbstractCapturingMethod` only (never concrete method names).
+Face traces use Lagrange extrapolation (hybrid override path reserved for later).
 """
 function residual!(
     du::AbstractArray{T,4},
@@ -67,7 +70,7 @@ function residual!(
     nx, ny = mesh.nx, mesh.ny
 
     u_work = similar(state.u)
-    copyto!(u_work, state.u)  # preprocess default
+    preprocess_state!(u_work, method, state, eq)
 
     fill!(du, zero(T))
 
@@ -257,7 +260,10 @@ function residual!(
         end
     end
 
-    # 2D: skip 1D Persson AV (method hooks that assume Array{T,3})
+    # Capturing: element sensor + dissipation (2D methods on Array{T,4})
+    σ = zeros(T, Nel)
+    sense!(σ, method, u_work, state, eq)
+    apply_dissipation!(du, method, σ, u_work, state, eq)
     return du
 end
 

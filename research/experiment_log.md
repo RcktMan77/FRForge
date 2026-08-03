@@ -9,6 +9,8 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 
 **CI policy (one line):** Every addition declares **required CI** vs **full/nightly/manual**; required CI stays under ~10–15 min on Ubuntu; no large VTU/invent trees as PR artifacts.
 
+**Phase 3.1:** 2D Persson AV path on Cartesian quads (tensor-product modal sensor + BR0 AV). Suite: `frforge test --suite 2d_capturing` (CI-light).
+
 ---
 
 ## Schema
