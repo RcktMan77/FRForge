@@ -39,7 +39,7 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **5 — Quantitative test suite & reporting** |
 | **Completed** | **6 — Invention-oriented research loop** |
 | **Completed** | **7 — High-order VTK writer** |
-| **Next** | **8 — 2D extension + visualization** |
+| **Completed** | **8 — 2D extension + visualization** |
 
 ### Milestone roadmap
 
@@ -109,12 +109,10 @@ Works on macOS and Linux with the same commands.
 # Milestone 6: invent / score a method vs Persson baseline
 ./bin/frforge invent --method scaled_persson --baseline persson_av --report-dir results/invent
 
-# Milestone 7: high-order VTU for ParaView (≥ 5.5)
+# Milestone 7–8: high-order VTU (1D and 2D) for ParaView (≥ 5.5)
 ./bin/frforge run --case euler_density_wave --p 3 --ne 16 --output results/euler.vtu
-./bin/frforge run --case sod --p 2 --ne 64 --method persson_av --output results/sod.vtu
-
-# Single runs
-./bin/frforge run --case sod --p 2 --ne 64 --method persson_av
+./bin/frforge run --case euler2d_wave --p 2 --ne 8 --t-final 0.5 --output results/euler2d.vtu
+./bin/frforge test --suite 2d --report results/m8/report.json
 
 # Help
 ./bin/frforge --help
