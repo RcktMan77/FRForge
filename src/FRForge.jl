@@ -28,6 +28,10 @@ include("solvestate/SolutionState.jl")
 # --- Equations ---
 include("equations/AbstractEquation.jl")
 include("equations/LinearAdvection.jl")
+include("equations/Burgers.jl")
+
+# --- Fluxes ---
+include("flux/Rusanov.jl")
 
 # --- Capturing hooks (nulls) ---
 include("capturing/Interfaces.jl")
@@ -61,8 +65,9 @@ export Mesh1D, physical_coords
 export SolutionState, allocate_state, set_initial_condition!
 export discrete_mass, l2_error
 
-export AbstractEquation, LinearAdvection1D
+export AbstractEquation, LinearAdvection1D, Burgers1D
 export physical_flux, numerical_flux, max_wave_speed, n_equations
+export rusanov_flux
 
 export AbstractCapturingMethod, NullCapturing
 export AbstractShockSensor, AbstractDissipationOperator
@@ -71,6 +76,8 @@ export NullSensor, NullDissipation
 export residual!, ssp_rk3!, ssp_rk3_step!, compute_dt
 
 export run_advection_smooth_order, run_advection_conservation, run_m1_advection_suite
-export observed_orders, order_pass
+export run_burgers_conservation, run_burgers_oscillation, run_m2_burgers_suite
+export burgers_square_ic
+export observed_orders, order_pass, solution_extrema, overshoot_metric
 
 end # module
