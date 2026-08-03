@@ -39,13 +39,13 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | # | Name | Success criterion (summary) |
 |---|------|------------------------------|
 | 0 | Skeleton & harness | `frforge test --report` → valid JSON; green CI |
-| 1 | 1D FR linear advection | Order ≈ formal (within 0.3); tight conservation |
+| 1 | 1D FR linear advection | Order ≈ formal (within 0.3) for \(p=2,3,4\); periodic mass ~ machine precision |
 | 2 | 1D inviscid Burgers | Runs, conserves, shows HO oscillations |
-| 3 | 1D Euler + smooth order | Formal order with capturing off |
+| 3 | 1D Euler + smooth order | Formal order with capturing off; non-periodic BC path |
 | 4 | Pluggable capturing interface | Abstract hooks + Persson AV baseline |
-| 5 | Quantitative suite | Sod, Shu–Osher, scored JSON summary |
-| 6 | Invention loop | `invent` / `score` vs baseline |
-| 7 | High-order VTK writer | ParaView-ready HO VTU |
+| 5 | Quantitative suite | Sod, Shu–Osher (self-converged hashed ref); scored JSON |
+| 6 | Invention loop | `invent` / `score` vs baseline; `promising` / `accepted_candidate` status |
+| 7 | High-order VTK writer | ParaView-ready HO VTU (may start after M3 for debug) |
 | 8 | 2D + visualization | 2D order tests + HO VTK |
 
 ---
@@ -54,6 +54,14 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 
 - Julia **≥ 1.10** (developed/tested on 1.11.x)
 - Git
+
+### CI & platforms
+
+| Environment | Role |
+|-------------|------|
+| **Ubuntu (GitHub Actions)** | **Primary / required / blocking** CI on PRs to `develop` and `main` (Julia 1.10 and 1.11) |
+| **macOS (local)** | **First-class** for development and verification — the dependency set (stdlib, JSON, ArgParse) is highly portable |
+| **macOS (GHA)** | Optional, non-blocking job later once core milestones are stable — not required for early milestones |
 
 ---
 
@@ -65,6 +73,8 @@ cd FRForge
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 chmod +x bin/frforge
 ```
+
+Works on macOS and Linux with the same commands.
 
 ---
 
