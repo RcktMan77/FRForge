@@ -1,0 +1,45 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+deps/build.log
+docs/build/
+docs/site/
+
+# Package environments (local only; Manifest.toml is committed)
+.julia/
+.CondaPkg/
+
+# Build / cache
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+
+# Test / coverage
+lcov.info
+coverage/
+.coverage
+
+# Runtime artifacts (JSON reports, VTK, logs)
+results/
+*.vtu
+*.vtk
+*.vtp
+*.pvtu
+
+# OS / editor
+.DS_Store
+.AppleDouble
+.LSOverride
+*~
+.*.swp
+.idea/
+.vscode/
+*.code-workspace
+
+# Local scratch
+tmp/
+scratch/
