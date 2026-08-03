@@ -32,7 +32,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | Status | Milestone |
 |--------|-----------|
 | **Completed** | **0 — Repository setup, project skeleton & verification harness** |
-| **Next** | **1 — 1D FR linear advection** |
+| **Completed** | **1 — 1D FR linear advection** |
+| **Next** | **2 — 1D inviscid Burgers** |
 
 ### Milestone roadmap
 
@@ -81,8 +82,14 @@ Works on macOS and Linux with the same commands.
 ## CLI
 
 ```bash
-# Milestone 0: write a valid JSON report skeleton
-./bin/frforge test --report results/smoke/report.json
+# Smoke: valid JSON skeleton only
+./bin/frforge test --suite smoke --report results/smoke/report.json
+
+# Milestone 1: linear advection order + conservation (p=2,3,4)
+./bin/frforge test --suite advection --report results/m1/report.json
+
+# Single sine-advection run
+./bin/frforge run --case advection_sine --p 3 --ne 16
 
 # Help
 ./bin/frforge --help
@@ -90,8 +97,8 @@ Works on macOS and Linux with the same commands.
 
 | Command | Purpose | Available |
 |---------|---------|-----------|
-| `frforge test [--report PATH] [--suite NAME]` | Verification → JSON | M0+ |
-| `frforge run ...` | Single case (+ optional VTK) | M1+ / M7 |
+| `frforge test [--report PATH] [--suite smoke\|advection\|m1\|full]` | Verification → JSON | M0+ |
+| `frforge run --case advection_sine ...` | Single advection run | M1 |
 | `frforge invent ...` | Method vs baseline | M6 |
 | `frforge score ...` | Score two reports | M6 |
 
