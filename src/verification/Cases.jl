@@ -379,3 +379,348 @@ function run_m2_burgers_suite()
     overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)
     return cases, overall, hard_fails
 end
+
+# ---------------------------------------------------------------------------
+# Milestone 3 — 1D Euler + BCs + smooth order
+# ---------------------------------------------------------------------------
+
+"""
+Exact density-wave solution (periodic):
+  ρ = 1 + A sin(2π(x - u0 t)),  u = u0,  p = p0  (constant)
+Conserved: (ρ, ρu, E) with E = p/(γ-1) + ½ ρ u².
+"""
+function euler_density_wave_conserved(eq::Euler1D{T}, x, t; A=T(0.2), u0=T(1), p0=T(1)) where {T}
+    ρ = one(T) + T(A) * sin(2π * (x - u0 * t))
+    return primitives_to_conserved(eq, ρ, u0, p0)
+end
+
+function _euler_order_study_dt(p::Int, Ne_fine::Int, λ_max::Float64; cfl::Float64=0.2)
+    h = 1.0 / Ne_fine
+    cfl_eff = cfl / (p + 1)
+    return cfl_eff * h / ((2p + 1) * max(λ_max, eps(Float64)))
+end
+
+"""Positivity over a full SolutionState for Euler."""
+function positivity_ok(eq::Euler1D, state::SolutionState; kwargs...)
+    return positivity_ok(eq, state.u; kwargs...)
+end
+
+"""
+    run_euler_smooth_order(; p, n_elements_list, t_final, cfl, order_tol)
+
+Smooth density-wave order study on periodic [0,1] with NullCapturing.
+Formal order target p+1 (density L2).
+"""
+function run_euler_smooth_order(;
+    p::Int=3,
+    n_elements_list::AbstractVector{Int}=[8, 16, 32],
+    t_final::Float64=1.0,
+    cfl::Float64=0.2,
+    order_tol::Float64=DEFAULT_ORDER_TOLERANCE,
+    γ::Float64=1.4,
+    method::AbstractCapturingMethod=NullCapturing(),
+)
+    t0 = time()
+    eq = Euler1D(γ)
+    ops = build_operators(p)
+    formal = p + 1
+    Ne_fine = maximum(n_elements_list)
+    λ_max = 2.5
+    dt_fixed = _euler_order_study_dt(p, Ne_fine, λ_max; cfl=cfl)
+
+    mesh_sizes = Float64[]
+    l2_errors = Float64[]
+    diverged = false
+    nan_detected = false
+    pos_ok = true
+
+    uexact = x -> euler_density_wave_conserved(eq, x, t_final)
+
+    for Ne in n_elements_list
+        mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+        state = allocate_state(mesh, ops, Val(3))
+        set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
+        result = ssp_rk3!(state, eq, method, t_final; dt=dt_fixed)
+        if result.status != :ok
+            diverged = true
+            nan_detected = true
+            push!(mesh_sizes, 1.0 / Ne)
+            push!(l2_errors, NaN)
+            continue
+        end
+        push!(mesh_sizes, 1.0 / Ne)
+        push!(l2_errors, l2_error(state, uexact, 1))
+        pos_ok = pos_ok && positivity_ok(eq, state)
+        if has_nonfinite(state.u)
+            nan_detected = true
+            diverged = true
+        end
+    end
+
+    obs = observed_orders(mesh_sizes, l2_errors)
+    opass = !diverged && order_pass(obs; formal_order=formal, tol=order_tol)
+
+    Ne = n_elements_list[end]
+    mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    state = allocate_state(mesh, ops, Val(3))
+    set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
+    M0 = [discrete_mass(state, c) for c in 1:3]
+    result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+    MT = [discrete_mass(state, c) for c in 1:3]
+    cres_comp = [conservation_residual_relative(M0[c], MT[c]) for c in 1:3]
+    abs_comp = [conservation_residual_absolute(M0[c], MT[c]) for c in 1:3]
+    cres = maximum(cres_comp)
+    cpass =
+        result.status == :ok &&
+        all(cres_comp[c] <= 1e-10 || abs_comp[c] <= 1e-11 for c in 1:3)
+    pos_ok = pos_ok && positivity_ok(eq, state)
+
+    case_pass = opass && cpass && !diverged && !nan_detected && pos_ok
+
+    return Dict{String,Any}(
+        "name" => "euler_smooth_order_p$(p)",
+        "case_type" => "smooth_order",
+        "equation" => "euler1d",
+        "p" => p,
+        "capturing_method" => "null",
+        "pass" => case_pass,
+        "diverged" => diverged,
+        "nan_detected" => nan_detected,
+        "conservation_residual" => cres,
+        "conservation_pass" => cpass,
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => pos_ok,
+        "wall_time_sec" => time() - t0,
+        "metrics" => Dict{String,Any}(
+            "γ" => γ,
+            "t_final" => t_final,
+            "cfl" => cfl,
+            "dt_fixed" => dt_fixed,
+            "conservation_residual_components" => cres_comp,
+            "mass_abs_change_components" => abs_comp,
+            "n_elements_list" => collect(n_elements_list),
+        ),
+        "mesh_sizes" => mesh_sizes,
+        "l2_errors" => l2_errors,
+        "observed_orders" => obs,
+        "formal_order" => formal,
+        "order_pass" => opass,
+        "order_tolerance" => order_tol,
+    )
+end
+
+"""
+    run_euler_conservation(; p, n_elements, t_final, cfl)
+
+Periodic Euler density wave: mass/momentum/energy conservation.
+"""
+function run_euler_conservation(;
+    p::Int=3,
+    n_elements::Int=32,
+    t_final::Float64=1.0,
+    cfl::Float64=0.2,
+    γ::Float64=1.4,
+    method::AbstractCapturingMethod=NullCapturing(),
+)
+    t0 = time()
+    eq = Euler1D(γ)
+    ops = build_operators(p)
+    mesh = Mesh1D(0.0, 1.0, n_elements; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    state = allocate_state(mesh, ops, Val(3))
+    set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
+    M0 = [discrete_mass(state, c) for c in 1:3]
+    result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+    MT = [discrete_mass(state, c) for c in 1:3]
+    cres_comp = [conservation_residual_relative(M0[c], MT[c]) for c in 1:3]
+    abs_comp = [conservation_residual_absolute(M0[c], MT[c]) for c in 1:3]
+    cres = maximum(cres_comp)
+    cpass =
+        result.status == :ok &&
+        all(cres_comp[c] <= 1e-11 || abs_comp[c] <= 1e-12 for c in 1:3)
+    diverged = result.status != :ok
+    nan_detected = diverged || has_nonfinite(state.u)
+    pos = positivity_ok(eq, state)
+
+    return Dict{String,Any}(
+        "name" => "euler_conservation_p$(p)",
+        "case_type" => "other",
+        "equation" => "euler1d",
+        "p" => p,
+        "capturing_method" => "null",
+        "pass" => cpass && !diverged && pos,
+        "diverged" => diverged,
+        "nan_detected" => nan_detected,
+        "conservation_residual" => cres,
+        "conservation_pass" => cpass,
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => pos,
+        "wall_time_sec" => time() - t0,
+        "metrics" => Dict{String,Any}(
+            "mass_initial" => M0,
+            "mass_final" => MT,
+            "mass_abs_change_components" => abs_comp,
+            "conservation_residual_components" => cres_comp,
+            "n_elements" => n_elements,
+            "n_steps" => result.n_steps,
+        ),
+    )
+end
+
+"""
+    run_bc_transmissive_test(; p, n_elements, t_final)
+
+Uniform free-stream with TransmissiveBC both ends — state should stay uniform.
+"""
+function run_bc_transmissive_test(;
+    p::Int=3,
+    n_elements::Int=16,
+    t_final::Float64=0.2,
+    cfl::Float64=0.2,
+    γ::Float64=1.4,
+)
+    t0 = time()
+    eq = Euler1D(γ)
+    ops = build_operators(p)
+    mesh = Mesh1D(
+        0.0,
+        1.0,
+        n_elements;
+        left_bc=TransmissiveBC(),
+        right_bc=TransmissiveBC(),
+    )
+    state = allocate_state(mesh, ops, Val(3))
+    U0 = primitives_to_conserved(eq, 1.0, 0.5, 1.0)
+    set_initial_condition!(state, _ -> U0)
+    result = ssp_rk3!(state, eq, NullCapturing(), t_final; cfl=cfl)
+    dev = 0.0
+    for c in 1:3
+        for e in 1:n_elements, j in 1:size(state.u, 1)
+            dev = max(dev, abs(state.u[j, e, c] - U0[c]))
+        end
+    end
+    ok = result.status == :ok && dev < 1e-10 && positivity_ok(eq, state)
+
+    return Dict{String,Any}(
+        "name" => "bc_transmissive_freestream_p$(p)",
+        "case_type" => "other",
+        "equation" => "euler1d",
+        "p" => p,
+        "capturing_method" => "null",
+        "pass" => ok,
+        "diverged" => result.status != :ok,
+        "nan_detected" => has_nonfinite(state.u),
+        "conservation_residual" => dev,
+        "conservation_pass" => dev < 1e-10,
+        "conservation_metric" => "none",
+        "positivity_ok" => positivity_ok(eq, state),
+        "wall_time_sec" => time() - t0,
+        "metrics" => Dict{String,Any}(
+            "max_deviation_from_uniform" => dev,
+            "n_steps" => result.n_steps,
+            "bc" => "transmissive",
+        ),
+    )
+end
+
+"""
+    run_bc_dirichlet_test(; p, n_elements, t_final)
+
+Dirichlet freestream both ends with uniform IC — should remain uniform.
+"""
+function run_bc_dirichlet_test(;
+    p::Int=3,
+    n_elements::Int=16,
+    t_final::Float64=0.2,
+    cfl::Float64=0.2,
+    γ::Float64=1.4,
+)
+    t0 = time()
+    eq = Euler1D(γ)
+    ops = build_operators(p)
+    U0 = primitives_to_conserved(eq, 1.0, 0.3, 1.0)
+    mesh = Mesh1D(
+        0.0,
+        1.0,
+        n_elements;
+        left_bc=DirichletBC(t -> U0),
+        right_bc=DirichletBC(t -> U0),
+    )
+    state = allocate_state(mesh, ops, Val(3))
+    set_initial_condition!(state, _ -> U0)
+    result = ssp_rk3!(state, eq, NullCapturing(), t_final; cfl=cfl)
+    dev = 0.0
+    for c in 1:3
+        for e in 1:n_elements, j in 1:size(state.u, 1)
+            dev = max(dev, abs(state.u[j, e, c] - U0[c]))
+        end
+    end
+    ok = result.status == :ok && dev < 1e-10 && positivity_ok(eq, state)
+
+    return Dict{String,Any}(
+        "name" => "bc_dirichlet_freestream_p$(p)",
+        "case_type" => "other",
+        "equation" => "euler1d",
+        "p" => p,
+        "capturing_method" => "null",
+        "pass" => ok,
+        "diverged" => result.status != :ok,
+        "nan_detected" => has_nonfinite(state.u),
+        "conservation_residual" => dev,
+        "conservation_pass" => dev < 1e-10,
+        "conservation_metric" => "none",
+        "positivity_ok" => positivity_ok(eq, state),
+        "wall_time_sec" => time() - t0,
+        "metrics" => Dict{String,Any}(
+            "max_deviation_from_uniform" => dev,
+            "n_steps" => result.n_steps,
+            "bc" => "dirichlet",
+        ),
+    )
+end
+
+"""
+    run_m3_euler_suite() -> (cases, overall_pass, hard_gate_failures)
+
+Euler smooth order (p=2,3,4), conservation, and BC path tests.
+"""
+function run_m3_euler_suite()
+    cases = Any[]
+    hard_fails = String[]
+
+    for p in (2, 3, 4)
+        # Pre-asymptotic rates on very coarse grids; use meshes in the asymptotic regime
+        nlist = p == 2 ? [16, 32, 64] : (p == 3 ? [8, 16, 32] : [16, 32, 64])
+        c = run_euler_smooth_order(; p=p, n_elements_list=nlist, cfl=0.1)
+        push!(cases, c)
+        if !c["order_pass"]
+            push!(hard_fails, "euler order failed p=$p observed=$(c["observed_orders"])")
+        end
+        if !c["conservation_pass"]
+            push!(hard_fails, "euler order-case conservation failed p=$p")
+        end
+        if !c["positivity_ok"]
+            push!(hard_fails, "euler positivity failed p=$p")
+        end
+
+        cc = run_euler_conservation(; p=p, n_elements=32)
+        push!(cases, cc)
+        if !cc["conservation_pass"]
+            push!(hard_fails, "euler conservation failed p=$p res=$(cc["conservation_residual"])")
+        end
+    end
+
+    bt = run_bc_transmissive_test()
+    push!(cases, bt)
+    if !bt["pass"]
+        push!(hard_fails, "transmissive BC freestream test failed")
+    end
+
+    bd = run_bc_dirichlet_test()
+    push!(cases, bd)
+    if !bd["pass"]
+        push!(hard_fails, "dirichlet BC freestream test failed")
+    end
+
+    overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)
+    return cases, overall, hard_fails
+end

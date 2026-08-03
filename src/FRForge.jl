@@ -29,6 +29,7 @@ include("solvestate/SolutionState.jl")
 include("equations/AbstractEquation.jl")
 include("equations/LinearAdvection.jl")
 include("equations/Burgers.jl")
+include("equations/Euler.jl")
 
 # --- Fluxes ---
 include("flux/Rusanov.jl")
@@ -65,19 +66,25 @@ export Mesh1D, physical_coords
 export SolutionState, allocate_state, set_initial_condition!
 export discrete_mass, l2_error
 
-export AbstractEquation, LinearAdvection1D, Burgers1D
+export AbstractEquation, LinearAdvection1D, Burgers1D, Euler1D
 export physical_flux, numerical_flux, max_wave_speed, n_equations
 export rusanov_flux
+export pressure, velocity, sound_speed, primitives_to_conserved, conserved_to_primitives
+export positivity_ok, positivity_ok_state
 
 export AbstractCapturingMethod, NullCapturing
 export AbstractShockSensor, AbstractDissipationOperator
 export NullSensor, NullDissipation
 
 export residual!, ssp_rk3!, ssp_rk3_step!, compute_dt
+export l2_error_all
 
 export run_advection_smooth_order, run_advection_conservation, run_m1_advection_suite
 export run_burgers_conservation, run_burgers_oscillation, run_m2_burgers_suite
 export burgers_square_ic
+export run_euler_smooth_order, run_euler_conservation, run_m3_euler_suite
+export run_bc_transmissive_test, run_bc_dirichlet_test
+export euler_density_wave_conserved
 export observed_orders, order_pass, solution_extrema, overshoot_metric
 
 end # module
