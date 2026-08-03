@@ -34,8 +34,12 @@ include("equations/Euler.jl")
 # --- Fluxes ---
 include("flux/Rusanov.jl")
 
-# --- Capturing hooks (nulls) ---
+# --- Capturing hooks + Persson AV baseline ---
 include("capturing/Interfaces.jl")
+include("capturing/PerssonAV.jl")
+
+# Register Persson after type is defined
+register_method!("persson_av", (; kwargs...) -> PerssonAVMethod(; kwargs...))
 
 # --- Residual + time ---
 include("fr/Residual.jl")
@@ -75,6 +79,12 @@ export positivity_ok, positivity_ok_state
 export AbstractCapturingMethod, NullCapturing
 export AbstractShockSensor, AbstractDissipationOperator
 export NullSensor, NullDissipation
+export PerssonSensor, ElementArtificialViscosity, PerssonAVMethod
+export default_persson_params, method_params
+export get_capturing_method, register_method!, METHOD_REGISTRY
+export sense!, apply_dissipation!, preprocess_state!, extrapolate_interface!
+export numerical_flux_method, post_step!
+export viscous_mass_residual_scale
 
 export residual!, ssp_rk3!, ssp_rk3_step!, compute_dt
 export l2_error_all
@@ -85,6 +95,7 @@ export burgers_square_ic
 export run_euler_smooth_order, run_euler_conservation, run_m3_euler_suite
 export run_bc_transmissive_test, run_bc_dirichlet_test
 export euler_density_wave_conserved
+export run_persson_vs_null_burgers, run_m4_capturing_suite
 export observed_orders, order_pass, solution_extrema, overshoot_metric
 
 end # module

@@ -15,4 +15,5 @@ using FRForge
     include("test_advection.jl")
     include("test_burgers.jl")
     include("test_euler.jl")
+    include("test_capturing.jl")
 end
