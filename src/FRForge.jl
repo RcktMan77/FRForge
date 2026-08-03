@@ -23,13 +23,17 @@ include("fr/Operators.jl")
 # --- Mesh / state ---
 include("mesh/BoundaryConditions.jl")
 include("mesh/Mesh1D.jl")
+include("mesh/Mesh2D.jl")
 include("solvestate/SolutionState.jl")
+include("solvestate/SolutionState2D.jl")
 
 # --- Equations ---
 include("equations/AbstractEquation.jl")
 include("equations/LinearAdvection.jl")
 include("equations/Burgers.jl")
 include("equations/Euler.jl")
+include("equations/LinearAdvection2D.jl")
+include("equations/Euler2D.jl")
 
 # --- Fluxes ---
 include("flux/Rusanov.jl")
@@ -38,14 +42,12 @@ include("flux/Rusanov.jl")
 include("capturing/Interfaces.jl")
 include("capturing/PerssonAV.jl")
 
-# Register Persson after type is defined
 register_method!("persson_av", (; kwargs...) -> PerssonAVMethod(; kwargs...))
-
-# Agent methods live only under src/methods/
 include("methods/Registry.jl")
 
 # --- Residual + time ---
 include("fr/Residual.jl")
+include("fr/Residual2D.jl")
 include("time/SSP_RK3.jl")
 
 # --- Verification ---
@@ -54,6 +56,7 @@ include("verification/Metrics.jl")
 include("verification/ExactSod.jl")
 include("verification/Scoring.jl")
 include("verification/Cases.jl")
+include("verification/Cases2D.jl")
 include("verification/Report.jl")
 
 # --- Invention loop ---
@@ -79,12 +82,15 @@ export g_DG_endpoints, g_DG_values_and_derivs, legendre_P
 
 export AbstractBC, PeriodicBC, TransmissiveBC, DirichletBC
 export Mesh1D, physical_coords
+export Mesh2D, element_index, element_coords, physical_xy, physical_coords_2d
 
-export SolutionState, allocate_state, set_initial_condition!
+export SolutionState, SolutionState2D, allocate_state, set_initial_condition!
 export discrete_mass, l2_error
 
 export AbstractEquation, LinearAdvection1D, Burgers1D, Euler1D
-export physical_flux, numerical_flux, max_wave_speed, n_equations
+export LinearAdvection2D, Euler2D
+export physical_flux, physical_flux_x, physical_flux_y, numerical_flux, numerical_flux_n
+export max_wave_speed, max_wave_speed_n, n_equations
 export rusanov_flux
 export pressure, velocity, sound_speed, primitives_to_conserved, conserved_to_primitives
 export positivity_ok, positivity_ok_state
@@ -115,12 +121,16 @@ export score_suite_absolute, apply_scores!, collect_hard_gate_failures
 export sample_solution_1d, shock_thickness_sp, excess_dissipation, smooth_region_mask
 export observed_orders, order_pass, solution_extrema, overshoot_metric
 
+export run_advection2d_smooth_order, run_euler2d_smooth_order, run_euler2d_discontinuous
+export run_m8_2d_suite
+
 export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report
 export classify_candidate, print_candidate_summary, score_suite_relative
 export tradeoff_ok, DEFAULT_SCORE_MARGIN
 
-export write_vtu_high_order, vtk_lagrange_line_nodes, vtk_point_counts_1d
+export write_vtu_high_order, vtk_lagrange_line_nodes, vtk_lagrange_quad_nodes
+export vtk_point_counts_1d, vtk_point_counts_2d
 export gl_to_equi_interp, parse_vtu_basic, VTK_LAGRANGE_LINE, VTK_LAGRANGE_QUAD
 
 end # module

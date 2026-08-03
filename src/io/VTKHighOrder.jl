@@ -245,3 +245,190 @@ function parse_vtu_basic(path::AbstractString)
     end
     return (n_points=n_points, n_cells=n_cells, types=types, connectivity=conn, text=txt)
 end
+
+# ---------------------------------------------------------------------------
+# 2D Lagrange quadrilateral (VTK type 70)
+# ---------------------------------------------------------------------------
+
+"""
+    vtk_lagrange_quad_nodes(p; T=Float64) -> Vector{NTuple{2,T}}
+
+Reference (ξ,η) nodes on [-1,1]² in VTK Lagrange quad order:
+corners, then edge interiors (bottom, right, top, left), then face interior.
+"""
+function vtk_lagrange_quad_nodes(p::Int; T::Type=Float64)
+    p >= 1 || throw(ArgumentError("p >= 1 for quads"))
+    nodes = NTuple{2,T}[]
+    # corners: SW, SE, NE, NW
+    push!(nodes, (-one(T), -one(T)))
+    push!(nodes, (one(T), -one(T)))
+    push!(nodes, (one(T), one(T)))
+    push!(nodes, (-one(T), one(T)))
+    if p >= 2
+        # bottom edge interiors: ξ increasing
+        for k in 1:(p - 1)
+            ξ = -one(T) + T(2k) / T(p)
+            push!(nodes, (ξ, -one(T)))
+        end
+        # right edge interiors: η increasing
+        for k in 1:(p - 1)
+            η = -one(T) + T(2k) / T(p)
+            push!(nodes, (one(T), η))
+        end
+        # top edge interiors: ξ decreasing (from SE-ish to SW along top from vertex1 to vertex3? edge 2 is NE→NW)
+        for k in 1:(p - 1)
+            ξ = one(T) - T(2k) / T(p)
+            push!(nodes, (ξ, one(T)))
+        end
+        # left edge interiors: η decreasing (NW→SW)
+        for k in 1:(p - 1)
+            η = one(T) - T(2k) / T(p)
+            push!(nodes, (-one(T), η))
+        end
+        # face interior: (p-1)² tensor, ξ fastest, η outer, increasing
+        for jj in 1:(p - 1), ii in 1:(p - 1)
+            ξ = -one(T) + T(2ii) / T(p)
+            η = -one(T) + T(2jj) / T(p)
+            push!(nodes, (ξ, η))
+        end
+    end
+    return nodes
+end
+
+function vtk_point_counts_2d(n_elements::Int, p::Int)
+    n_per = (p + 1)^2
+    return (n_elements * n_per, n_elements, n_per)
+end
+
+"""
+    write_vtu_high_order(path, state::SolutionState2D, eq) -> path
+
+Discontinuous high-order VTU with VTK_LAGRANGE_QUAD cells.
+"""
+function write_vtu_high_order(
+    path::AbstractString,
+    state::SolutionState2D{T,Neq},
+    eq;
+    fields::Symbol=:auto,
+) where {T,Neq}
+    mesh, ops = state.mesh, state.ops
+    p = ops.p
+    nodes_ref = vtk_lagrange_quad_nodes(p; T=T)
+    n_per = length(nodes_ref)
+    Nel = mesh.n_elements
+    n_pts = Nel * n_per
+    n_cells = Nel
+    Np = length(ops.ξ)
+
+    ξ_gl = ops.ξ
+    ℓ_cache = [lagrange_at(ξ_gl, ξη[1]) for ξη in nodes_ref]
+    m_cache = [lagrange_at(ξ_gl, ξη[2]) for ξη in nodes_ref]
+
+    coords = zeros(T, 3, n_pts)
+    is_euler = eq isa Euler2D
+    field_data = Dict{String,Vector{T}}()
+    if is_euler
+        for name in ("rho", "u", "v", "p", "rho_u", "rho_v", "E")
+            field_data[name] = zeros(T, n_pts)
+        end
+    else
+        field_data["u"] = zeros(T, n_pts)
+    end
+
+    @inbounds for e in 1:Nel
+        base = (e - 1) * n_per
+        for a in 1:n_per
+            ξ, η = nodes_ref[a]
+            x, y = physical_xy(mesh, e, ξ, η)
+            pid = base + a
+            coords[1, pid] = x
+            coords[2, pid] = y
+            coords[3, pid] = zero(T)
+            ℓξ = ℓ_cache[a]
+            ℓη = m_cache[a]
+            U = zeros(T, Neq)
+            for c in 1:Neq
+                s = zero(T)
+                for jb in 1:Np, ib in 1:Np
+                    s += state.u[ib, jb, e, c] * ℓξ[ib] * ℓη[jb]
+                end
+                U[c] = s
+            end
+            if is_euler
+                ρ, u, v, pres = conserved_to_primitives(eq, U)
+                field_data["rho"][pid] = ρ
+                field_data["u"][pid] = u
+                field_data["v"][pid] = v
+                field_data["p"][pid] = pres
+                field_data["rho_u"][pid] = U[2]
+                field_data["rho_v"][pid] = U[3]
+                field_data["E"][pid] = U[4]
+            else
+                field_data["u"][pid] = U[1]
+            end
+        end
+    end
+
+    mkpath(dirname(abspath(path)))
+    open(path, "w") do io
+        println(io, "<?xml version=\"1.0\"?>")
+        println(io, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">")
+        println(io, "  <UnstructuredGrid>")
+        println(io, "    <Piece NumberOfPoints=\"$n_pts\" NumberOfCells=\"$n_cells\">")
+        println(io, "      <Points>")
+        println(io, "        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">")
+        for i in 1:n_pts
+            println(io, "          ", Float64(coords[1, i]), " ", Float64(coords[2, i]), " ", Float64(coords[3, i]))
+        end
+        println(io, "        </DataArray>")
+        println(io, "      </Points>")
+        println(io, "      <Cells>")
+        println(io, "        <DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">")
+        for e in 1:Nel
+            base = (e - 1) * n_per
+            print(io, "          ")
+            for a in 0:(n_per - 1)
+                print(io, base + a)
+                a < n_per - 1 && print(io, " ")
+            end
+            println(io)
+        end
+        println(io, "        </DataArray>")
+        println(io, "        <DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">")
+        print(io, "          ")
+        for e in 1:Nel
+            print(io, e * n_per)
+            e < Nel && print(io, " ")
+        end
+        println(io)
+        println(io, "        </DataArray>")
+        println(io, "        <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">")
+        print(io, "          ")
+        for e in 1:Nel
+            print(io, VTK_LAGRANGE_QUAD)
+            e < Nel && print(io, " ")
+        end
+        println(io)
+        println(io, "        </DataArray>")
+        println(io, "      </Cells>")
+        scalar0 = is_euler ? "rho" : "u"
+        println(io, "      <PointData Scalars=\"$scalar0\">")
+        names = is_euler ? ("rho", "u", "v", "p", "rho_u", "rho_v", "E") : ("u",)
+        for name in names
+            println(io, "        <DataArray type=\"Float64\" Name=\"$name\" format=\"ascii\">")
+            print(io, "          ")
+            v = field_data[name]
+            for i in 1:n_pts
+                print(io, Float64(v[i]))
+                i < n_pts && print(io, " ")
+            end
+            println(io)
+            println(io, "        </DataArray>")
+        end
+        println(io, "      </PointData>")
+        println(io, "    </Piece>")
+        println(io, "  </UnstructuredGrid>")
+        println(io, "</VTKFile>")
+    end
+    return path
+end

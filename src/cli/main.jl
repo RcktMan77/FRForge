@@ -101,7 +101,7 @@ function _parse_run_args(args)
     )
     @add_arg_table! s begin
         "--case"
-        help = "Case: advection_sine|burgers_square|euler_density_wave|sod|shu_osher"
+        help = "Case: advection_sine|…|sod|shu_osher|advection2d|euler2d_wave|euler2d_jump"
         default = "advection_sine"
         "--p"
         help = "Polynomial degree"
@@ -178,19 +178,24 @@ function cli_test(opts::AbstractDict)
         cases, overall_pass, hard_fails = run_m5_quant_suite(; method_name=method)
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+    elseif suite in ("2d", "m8")
+        cases, overall_pass, hard_fails, _, _ = run_m8_2d_suite()
+        diverged = any(c -> get(c, "diverged", false) === true, cases)
+        nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     elseif suite == "full"
         c1, p1, f1 = run_m1_advection_suite()
         c2, p2, f2 = run_m2_burgers_suite()
         c3, p3, f3 = run_m3_euler_suite()
         c4, p4, f4 = run_m4_capturing_suite()
         c5, p5, f5 = run_m5_quant_suite(; method_name=method)
-        cases = vcat(c1, c2, c3, c4, c5)
-        hard_fails = vcat(f1, f2, f3, f4, f5)
-        overall_pass = p1 && p2 && p3 && p4 && p5
+        c8, p8, f8, _, _ = run_m8_2d_suite()
+        cases = vcat(c1, c2, c3, c4, c5, c8)
+        hard_fails = vcat(f1, f2, f3, f4, f5, f8)
+        overall_pass = p1 && p2 && p3 && p4 && p5 && p8
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     else
-        println(stderr, "Unknown suite: $suite (use smoke|advection|burgers|euler|capturing|quant|full)")
+        println(stderr, "Unknown suite: $suite (use smoke|…|quant|2d|full)")
         return 2
     end
 
@@ -378,6 +383,73 @@ function cli_run(args)
             _maybe_write_vtu(opts, state, eq)
         end
         return c["pass"] ? 0 : 1
+    elseif case == "advection2d"
+        ax, ay = 1.0, 0.5
+        eq = LinearAdvection2D(ax, ay)
+        ops = build_operators(p)
+        mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, Ne, Ne)
+        state = allocate_state(mesh, ops, Val(1))
+        set_initial_condition!(state, (x, y) -> sin(2π * x) * sin(2π * y))
+        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+        err = l2_error(
+            state,
+            (x, y) -> sin(2π * (x - ax * t_final)) * sin(2π * (y - ay * t_final)),
+            1,
+        )
+        println("case=advection2d p=$p ne=$(Ne)x$(Ne) t_final=$t_final L2=$err status=$(result.status)")
+        _maybe_write_vtu(opts, state, eq)
+        return result.status == :ok ? 0 : 1
+    elseif case == "euler2d_wave"
+        eq = Euler2D(1.4)
+        ops = build_operators(p)
+        mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, Ne, Ne)
+        state = allocate_state(mesh, ops, Val(4))
+        set_initial_condition!(
+            state,
+            (x, y) ->
+                primitives_to_conserved(
+                    eq,
+                    1.0 + 0.2 * sin(2π * x) * sin(2π * y),
+                    1.0,
+                    1.0,
+                    1.0,
+                ),
+        )
+        result = ssp_rk3!(state, eq, method, t_final; cfl=min(cfl, 0.15))
+        println(
+            "case=euler2d_wave p=$p ne=$(Ne)x$(Ne) t_final=$t_final status=$(result.status) pos=$(positivity_ok(eq, state))",
+        )
+        _maybe_write_vtu(opts, state, eq)
+        return result.status == :ok ? 0 : 1
+    elseif case == "euler2d_jump"
+        eq = Euler2D(1.4)
+        ops = build_operators(p)
+        mesh = Mesh2D(
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            Ne,
+            Ne;
+            left_bc=TransmissiveBC(),
+            right_bc=TransmissiveBC(),
+            bottom_bc=TransmissiveBC(),
+            top_bc=TransmissiveBC(),
+        )
+        state = allocate_state(mesh, ops, Val(4))
+        set_initial_condition!(
+            state,
+            (x, y) ->
+                x < 0.5 ? primitives_to_conserved(eq, 1.0, 0.0, 0.0, 1.0) :
+                primitives_to_conserved(eq, 0.125, 0.0, 0.0, 0.1),
+        )
+        tf = opts["t_final"] == 1.0 ? 0.05 : opts["t_final"]
+        result = ssp_rk3!(state, eq, method, tf; cfl=min(cfl, 0.1))
+        println(
+            "case=euler2d_jump p=$p ne=$(Ne)x$(Ne) t_final=$tf status=$(result.status) pos=$(positivity_ok(eq, state))",
+        )
+        _maybe_write_vtu(opts, state, eq)
+        return result.status == :ok ? 0 : 1
     else
         println(stderr, "Unknown case: $case")
         return 2
