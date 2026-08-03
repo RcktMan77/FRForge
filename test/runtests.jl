@@ -16,4 +16,5 @@ using FRForge
     include("test_burgers.jl")
     include("test_euler.jl")
     include("test_capturing.jl")
+    include("test_quant.jl")
 end
