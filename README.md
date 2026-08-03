@@ -38,7 +38,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **4 — Pluggable shock-capturing interface** |
 | **Completed** | **5 — Quantitative test suite & reporting** |
 | **Completed** | **6 — Invention-oriented research loop** |
-| **Next** | **7 — High-order VTK writer** |
+| **Completed** | **7 — High-order VTK writer** |
+| **Next** | **8 — 2D extension + visualization** |
 
 ### Milestone roadmap
 
@@ -107,8 +108,10 @@ Works on macOS and Linux with the same commands.
 
 # Milestone 6: invent / score a method vs Persson baseline
 ./bin/frforge invent --method scaled_persson --baseline persson_av --report-dir results/invent
-./bin/frforge score --method-report results/invent/method_scaled_persson.json \
-  --baseline-report results/invent/baseline_persson_av.json
+
+# Milestone 7: high-order VTU for ParaView (≥ 5.5)
+./bin/frforge run --case euler_density_wave --p 3 --ne 16 --output results/euler.vtu
+./bin/frforge run --case sod --p 2 --ne 64 --method persson_av --output results/sod.vtu
 
 # Single runs
 ./bin/frforge run --case sod --p 2 --ne 64 --method persson_av
@@ -123,6 +126,13 @@ Works on macOS and Linux with the same commands.
 | `frforge run --case … [--method …]` | Single run | M1+ |
 | `frforge invent --method M --baseline persson_av` | Quant suite + `candidate_status` | M6 |
 | `frforge score --method-report a.json --baseline-report b.json` | Classify two reports | M6 |
+| `frforge run … --output sol.vtu` | High-order discontinuous Lagrange VTU | M7 |
+
+### ParaView notes
+
+- Prefer **ParaView ≥ 5.5** for `VTK_LAGRANGE_LINE` (type 68) support.
+- 1D solutions are written as discontinuous high-order line cells (jumps visible at faces).
+- Euler fields: `rho`, `u`, `p` (primitives) and `rho`, `rho_u`, `E` (conserved).
 
 ---
 

@@ -125,8 +125,12 @@ function _parse_run_args(args)
         arg_type = Float64
         default = 1.0
         "--method"
-        help = "Capturing method: null | persson_av"
+        help = "Capturing method: null | persson_av | scaled_persson"
         default = "null"
+        "--output"
+        help = "Optional high-order VTU output path (ParaView)"
+        default = ""
+        dest_name = "output"
     end
     return parse_args(args, s)
 end
@@ -256,6 +260,17 @@ function cli_test(opts::AbstractDict)
     return overall_pass ? 0 : 1
 end
 
+"""Optionally write high-order VTU if --output is set."""
+function _maybe_write_vtu(opts, state, eq)
+    out = opts["output"]
+    if !isempty(out)
+        write_vtu_high_order(out, state, eq)
+        println("VTU written: $(abspath(out))  (open in ParaView ≥ 5.5)")
+        return true
+    end
+    return false
+end
+
 function cli_run(args)
     opts = _parse_run_args(args)
     case = opts["case"]
@@ -279,6 +294,7 @@ function cli_run(args)
         println("case=advection_sine p=$p ne=$Ne a=$a t_final=$t_final cfl=$cfl method=$(opts["method"])")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_error=$err mass_change=$(MT - M0)")
+        _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1
     elseif case == "burgers_square"
         eq = Burgers1D()
@@ -298,6 +314,7 @@ function cli_run(args)
         if opts["method"] == "null"
             println("note: pure high-order FR is expected to oscillate near the discontinuity")
         end
+        _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1
     elseif case == "euler_density_wave"
         eq = Euler1D(1.4)
@@ -312,9 +329,17 @@ function cli_run(args)
         println("case=euler_density_wave p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"])")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_density=$err mass_change=$(MT - M0) positivity=$(positivity_ok(eq, state))")
+        _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1
     elseif case == "sod"
-        tf = opts["t_final"] == 1.0 ? 0.2 : opts["t_final"]  # default t=0.2 for Sod
+        tf = opts["t_final"] == 1.0 ? 0.2 : opts["t_final"]
+        # Run solver again for VTU (run_sod returns metrics only)
+        eq = Euler1D(1.4)
+        ops = build_operators(p)
+        mesh = Mesh1D(0.0, 1.0, Ne; left_bc=TransmissiveBC(), right_bc=TransmissiveBC())
+        state = allocate_state(mesh, ops, Val(3))
+        set_initial_condition!(state, x -> sod_ic(eq, x))
+        result = ssp_rk3!(state, eq, method, tf; cfl=min(cfl, 0.15))
         c = run_sod(;
             p=p,
             n_elements=Ne,
@@ -326,9 +351,18 @@ function cli_run(args)
         println("case=sod p=$p ne=$Ne t_final=$tf method=$(opts["method"])")
         println("status=$(c["pass"] ? "ok" : "fail") η=$(c["overshoot"]) δ=$(c["shock_thickness"]) Dex=$(c["excess_dissipation"])")
         println("L1_vs_exact=$(c["l1_error_vs_reference"]) positivity=$(c["positivity_ok"])")
+        if result.status == :ok
+            _maybe_write_vtu(opts, state, eq)
+        end
         return c["pass"] ? 0 : 1
     elseif case == "shu_osher"
         tf = opts["t_final"] == 1.0 ? 1.8 : opts["t_final"]
+        eq = Euler1D(1.4)
+        ops = build_operators(p)
+        mesh = Mesh1D(0.0, 10.0, Ne; left_bc=TransmissiveBC(), right_bc=TransmissiveBC())
+        state = allocate_state(mesh, ops, Val(3))
+        set_initial_condition!(state, x -> shu_osher_ic(eq, x))
+        result = ssp_rk3!(state, eq, method, tf; cfl=cfl)
         c = run_shu_osher(;
             p=p,
             n_elements=Ne,
@@ -340,6 +374,9 @@ function cli_run(args)
         println("case=shu_osher p=$p ne=$Ne t_final=$tf method=$(opts["method"])")
         println("status=$(c["pass"] ? "ok" : "fail") η=$(c["overshoot"]) δ=$(c["shock_thickness"]) Dex=$(c["excess_dissipation"])")
         println("positivity=$(c["positivity_ok"])")
+        if result.status == :ok
+            _maybe_write_vtu(opts, state, eq)
+        end
         return c["pass"] ? 0 : 1
     else
         println(stderr, "Unknown case: $case")

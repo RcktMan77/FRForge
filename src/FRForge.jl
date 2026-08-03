@@ -61,6 +61,9 @@ include("invent/Experiment.jl")
 include("invent/Candidate.jl")
 include("invent/Invent.jl")
 
+# --- I/O ---
+include("io/VTKHighOrder.jl")
+
 # --- CLI ---
 include("cli/main.jl")
 
@@ -116,5 +119,8 @@ export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report
 export classify_candidate, print_candidate_summary, score_suite_relative
 export tradeoff_ok, DEFAULT_SCORE_MARGIN
+
+export write_vtu_high_order, vtk_lagrange_line_nodes, vtk_point_counts_1d
+export gl_to_equi_interp, parse_vtu_basic, VTK_LAGRANGE_LINE, VTK_LAGRANGE_QUAD
 
 end # module
