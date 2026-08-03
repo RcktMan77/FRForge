@@ -72,7 +72,7 @@ function discrete_mass(state::SolutionState{T}, c::Int=1) where {T}
     return m
 end
 
-"""L2 norm of error vs exact function `uexact(x)` for component `c`."""
+"""L2 norm of error vs exact function `uexact(x)` for component `c` (scalar exact)."""
 function l2_error(state::SolutionState{T}, uexact, c::Int=1) where {T}
     mesh, ops = state.mesh, state.ops
     Np, Nel = size(state.u, 1), size(state.u, 2)
@@ -80,9 +80,21 @@ function l2_error(state::SolutionState{T}, uexact, c::Int=1) where {T}
     for e in 1:Nel
         xs = physical_coords(mesh, ops, e)
         for j in 1:Np
-            err = state.u[j, e, c] - T(uexact(xs[j]))
+            val = uexact(xs[j])
+            exact = val isa Number ? T(val) : T(val[c])
+            err = state.u[j, e, c] - exact
             acc += ops.w[j] * mesh.J[e] * err * err
         end
     end
     return sqrt(acc)
+end
+
+"""Combined L2 error over all conserved components: √(Σ_c ‖U_c−Uex_c‖²)."""
+function l2_error_all(state::SolutionState{T,Neq}, uexact) where {T,Neq}
+    s = zero(T)
+    for c in 1:Neq
+        e = l2_error(state, uexact, c)
+        s += e * e
+    end
+    return sqrt(s)
 end
