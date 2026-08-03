@@ -5,7 +5,7 @@
 | **Title** | FRForge — High-Order Flux Reconstruction Laboratory |
 | **Author** | FRForge maintainers (RcktMan77) |
 | **Date** | 2026-08-03 |
-| **Status** | Approved |
+| **Status** | Approved (with plan-review incorporation, 2026-08-03) |
 | **Repository** | https://github.com/RcktMan77/FRForge.git |
 | **Local path** | `/Users/zdavis/Desktop/FRForge` |
 | **Language / runtime** | Julia ≥ 1.10 (tested on 1.11.7) |
@@ -98,6 +98,11 @@ High-order FR/CPR schemes achieve excellent accuracy in smooth regions but produ
 | K16 | **Julia compat `≥ 1.10`**; CI and local test on 1.11.7; **commit `Manifest.toml` from end of M0** | Reproducible env; LTS-friendly floor |
 | K17 | **Rusanov default numerical flux**; HLL deferred (no `HLL.jl` until a PR needs it) | Avoid dead code paths |
 | K18 | **Baseline AV in conservative viscous-flux form**; element-scalar \(\sigma_e\); density modes for Euler sensor | Conservation scoring remains meaningful with capturing on |
+| K19 | **CI: Ubuntu primary/blocking**; macOS first-class for local dev; optional non-blocking macOS GHA later | Free-tier reliability; portable deps |
+| K20 | **Shu–Osher reference: self-converged fine-grid NullCapturing (or trusted) scheme + published sanity check + hash** | Do not rely solely on external tables |
+| K21 | **Promising method criteria + JSON status field** for invent/score | Agents and humans share a clear success definition |
+| K22 | **Order studies at least \(p\in\{2,3,4\}\)** with several mesh sizes | Robust observed-order evidence |
+| K23 | **Excess dissipation primarily relative to NullCapturing** on same mesh/time; absolute entropy secondary | Fair order-vs-dissipation trade-off |
 
 ---
 
@@ -942,23 +947,43 @@ E = \Bigl(\sum_e\sum_j w_j J_e |u_{j,e}-u^{\mathrm{ex}}_{j,e}|^2\Bigr)^{1/2}.
 
 The same \(p+1\) target applies to smooth periodic Euler order tests unless a case documents a lower rate (none in M0–M5 defaults).
 
-`order_pass` iff every reported \(q\) satisfies \(q \ge \texttt{formal\_order} - \texttt{order\_tolerance}\) with `order_tolerance=0.3` (one-sided: under-order fails; slight super-order OK).
+`order_pass` iff every reported \(q\) satisfies \(q \ge \texttt{formal\_order} - \texttt{order\_tolerance}\) with `order_tolerance=0.3` (one-sided: under-order fails; slight super-order OK). Early milestones keep this tolerance.
 
-**Conservation residual:**
+**Order study design (M1 / M3 / M5 — required):**
 
-- **`periodic_mass_change`:**  
-  \( R = \bigl|\sum_e\sum_j w_j J_e (u_{j,e}(T)-u_{j,e}(0))\bigr| \)  
-  for the conserved density (or scalar). Pass if \(R \le 10^{-10}\) (advection) or documented tol.
-- **`inviscid_telescoping` (open BC, e.g. Sod):** do **not** require \(R\approx 0\). Instead verify that the discrete update without AV matches telescoping interface fluxes (unit test), and report  
-  \( R_{\mathrm{mass}} = M(T)-M(0) \) as diagnostic only; `conservation_pass` based on \(|M(T)-M(0)-\int_0^T (F_{\mathrm{left}}-F_{\mathrm{right}})\,dt| \le \mathrm{tol}\) using recorded boundary numerical fluxes. If time-integrated boundary flux is unavailable in M5 v1, set `conservation_metric="none"`, `conservation_pass=true` only when the scheme unit tests pass telescoping, and still report raw `conservation_residual` as mass change diagnostic.
+- Run smooth-order cases across **at least** polynomial degrees \(p \in \{2,3,4\}\) and **several mesh sizes** (at least three refinements per \(p\)) so observed-order slopes are robust.
+- Report per-\(p\) sequences: `mesh_sizes`, `l2_errors`, `observed_orders`.
+- Suite-level `order_pass` requires every included \(p\) to pass its order gate (unless a case documents exclusion).
 
-**Excess dissipation** (discontinuous cases with reference \(u^{\mathrm{ref}}\) on smooth mask \(S\)):
+**Conservation residual (by BC class):**
+
+- **`periodic_mass_change` (smooth periodic problems):**  
+  \[
+  R = \bigl|\sum_e\sum_j w_j J_e (u_{j,e}(T)-u_{j,e}(0))\bigr|
+  \]
+  for each conserved field that must be conserved (scalar mass; Euler: mass, momentum, energy as applicable).  
+  **Pass target:** relative residual near machine precision, roughly **\(10^{-12}\)–\(10^{-14}\)** of the initial integral mass (accounting for accumulation over many steps). Absolute floor may be used when the integral is \(\mathcal{O}(1)\). Early M1 may document a slightly looser floor if SSP-RK3 + GL quadrature force it; tighten toward the machine-precision band as the residual path matures.
+- **`inviscid_telescoping` (open BC, e.g. Sod):** do **not** require global mass \(R\approx 0\). Verify discrete telescoping of interface fluxes (unit test), and report  
+  \( R_{\mathrm{mass}} = M(T)-M(0) \) as diagnostic; `conservation_pass` based on  
+  \(|M(T)-M(0)-\int_0^T (F_{\mathrm{left}}-F_{\mathrm{right}})\,dt| \le \mathrm{tol}\)  
+  using recorded boundary numerical fluxes. If time-integrated boundary flux is unavailable in M5 v1, set `conservation_metric="none"`, `conservation_pass=true` only when scheme unit tests pass telescoping, and still report raw `conservation_residual` as mass-change diagnostic.
+- **`none`:** no conservation hard gate; residual still reported when meaningful.
+
+**Excess dissipation** (discontinuous / capturing-on cases):
+
+**Primary (preferred):** relative measure against a pure high-order **`NullCapturing`** reference run on the **same mesh, \(p\), CFL policy, and time interval**:
 
 \[
-D_{\mathrm{ex}} = \frac{\sum_{j\in S} |u_j - u^{\mathrm{ref}}_j|}{\sum_{j\in S} |u^{\mathrm{ref}}_j|} .
+D_{\mathrm{ex}} = \frac{\sum_{j\in S} |u_j - u^{\mathrm{null}}_j|}{\sum_{j\in S} |u^{\mathrm{null}}_j|+\varepsilon},
 \]
 
-Mask \(S\): points where the high-resolution reference gradient is below a threshold (e.g. \(|\partial_x\rho^{\mathrm{ref}}| < 0.1 \max|\partial_x\rho^{\mathrm{ref}}|\)) **and** outside shock/contact windows tabulated per case (Sod: exclude neighborhoods of shock/contact/rarefaction head-tail as documented in `Cases.jl`). If no reference, `excess_dissipation` may be `null` and score component uses overshoot-only fallback.
+where \(S\) is the smooth-region mask (below). This directly scores the order-vs-dissipation trade-off vs undamped high-order FR.
+
+**Secondary (always report when available):** absolute entropy production (or entropy residual) over the run as a diagnostic field under `metrics.entropy_production` (not the sole invent ranking signal).
+
+**Optional / M5 high-res path:** when a frozen fine-grid reference \(u^{\mathrm{ref}}\) exists (Shu–Osher), also report smooth-mask error vs that reference for documentation; invent scoring still prefers NullCapturing-relative \(D_{\mathrm{ex}}\) when both are available.
+
+Mask \(S\): points where the high-resolution or NullCapturing reference gradient is below a threshold (e.g. \(|\partial_x\rho| < 0.1 \max|\partial_x\rho|\)) **and** outside shock/contact windows tabulated per case (Sod: exclude neighborhoods of shock/contact/rarefaction head-tail as documented in `Cases.jl`). If no usable reference, `excess_dissipation` may be `null` and score component uses overshoot-only fallback.
 
 **Shock thickness:** 10%–90% rise distance of primary jump (density for Sod), measured along sorted unique \(x\) samples at SPs, reported in **units of solution-point spacings** along the jump:
 
@@ -1098,6 +1123,68 @@ const METHOD_REGISTRY = Dict{String,Function}(
 
 3. Run invent/score CLI; hard gates applied; composite from locked weights.
 4. **Primary research goal:** structural novelty via hooks; coefficient-only search is allowed but not the headline invent path.
+5. After M6 lands: maintain a short **“How to add a new method”** section in the README (and a pointer in this design doc) so the invention path stays low-friction.
+
+#### Definition of a successful / promising new method
+
+A candidate is **successfully identified / promising** when **all** of the following hold:
+
+1. **`overall_pass == true`** — hard gates: order preservation on required smooth-order cases, positivity on Euler cases, conservation where declared, no NaNs/divergence.
+2. **Composite score meaningfully better than the classical Persson AV baseline**, or ranks at the top of currently registered methods that pass the gates. A small margin \(\delta_{\mathrm{score}}\) (default **0.02** on the composite in \([0,1]\); configurable, recorded in JSON) suppresses noise.
+3. **Improvement appears in the order-vs-dissipation trade-off** — e.g. better (or equal) order component and strictly better dissipation and/or shock-quality components vs baseline, or a documented composite win that is not solely from robustness binary flips. JSON should record which components improved under `summary.tradeoff_notes` or structured flags.
+4. **High-order VTK output is produced** for the primary discontinuous demonstration case(s) so the user can visually inspect results in ParaView (requires M7 writer when available; until then invent may set `vtk_produced=false` and cannot mark `accepted_candidate`).
+
+#### JSON / CLI surface for invent status
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `candidate_status` | String | `"rejected"` \| `"pass_gates"` \| `"promising"` \| `"accepted_candidate"` |
+| `baseline_composite` | Number or null | Baseline composite when compared |
+| `composite_margin` | Number or null | `composite - baseline_composite` |
+| `score_margin_threshold` | Number | \(\delta_{\mathrm{score}}\) used |
+| `vtk_produced` | Bool | Whether HO VTU was written for inspection |
+| `tradeoff_ok` | Bool | Order-vs-dissipation improvement criterion met |
+
+**Status rules (normative):**
+
+- `rejected` — hard gates failed or run diverged.
+- `pass_gates` — `overall_pass` but not better than baseline by margin, or trade-off criterion failed.
+- `promising` — gates pass, composite better by \(\ge \delta_{\mathrm{score}}\), trade-off OK; VTK optional but recommended.
+- `accepted_candidate` — same as promising **and** `vtk_produced=true` (user-inspectable).
+
+CLI (`frforge invent` / `frforge score`) **must** print a short human-readable summary, e.g.:
+
+```text
+Method: my_novel    status: promising
+overall_pass: true   composite: 0.81  baseline(persson_av): 0.74  margin: +0.07
+tradeoff_ok: true    vtk_produced: false
+Hard gates: (none)
+```
+
+---
+
+### Shu–Osher / discontinuous reference data policy (M5)
+
+Do **not** rely solely on external tabulated data.
+
+1. **Generate** a fine-grid reference with a high-order **`NullCapturing`** (or other trusted high-resolution) scheme **after** the FR baseline solver exists (post-M4 preferred; generator may use M3 Euler + NullCapturing).
+2. **Self-convergence study:** successive refinement in \(h\) and/or \(p\) until key diagnostics stabilize within a tight tolerance (document targets), including at least:
+   - primary shock location,
+   - density extrema in the high-frequency post-shock region,
+   - optional: integrated smooth-region density.
+3. **Sanity comparison** against established published high-resolution / tabulated Shu–Osher results (qualitative profile + key scalar diagnostics); record references and differences.
+4. **Freeze** the final CSV (or binary) reference; store **hash** (e.g. SHA-256); document **all generation parameters** (\(p\), \(N_e\), CFL, \(t_{\mathrm{final}}\), BC, scheme) and the convergence + comparison evidence in `test/data/README.md`.
+5. Ship generator script under `test/data/generate_shu_osher_reference.jl` (or equivalent) so references are reproducible.
+
+---
+
+### CI platform policy
+
+| Environment | Role |
+|-------------|------|
+| **Ubuntu (GitHub Actions)** | **Primary / required / blocking** CI for PRs to `develop` and `main` (reliability + free-tier practicality). Julia 1.10 and 1.11. |
+| **macOS local** | **First-class** for development and verification; dependency set (JSON, ArgParse, stdlib) is highly portable. Document setup in README. |
+| **macOS GHA** | **Optional**, non-blocking or later-required job once core milestones are stable (post–M3 or post–M5). Not required for M0–M2. |
 
 ---
 
@@ -1352,16 +1439,20 @@ test = ["Test"]
 ### Milestone 1 — Linear advection
 
 - Operators + Appendix C \(g_{DG}\); Mesh1D with PeriodicBC; SolutionState; **NullCapturing in residual!**; SSP-RK3; order + conservation.
-- Success: order within tolerance; conservation tight.
+- **Order study:** at least \(p \in \{2,3,4\}\) and several mesh sizes per \(p\); `order_tolerance=0.3`.
+- **Conservation:** periodic mass residual near machine precision (target \(10^{-12}\)–\(10^{-14}\) relative).
+- Success: observed order within tolerance for each tested \(p\); conservation gate passes.
 
 ### Milestone 2 — Burgers
 
 - Nonlinear scalar; oscillatory failure without capturing.
+- Success: runs, conserves (periodic), documents expected HO oscillations (overshoot metric).
 
 ### Milestone 3 — Euler + BCs
 
 - Euler1D + Rusanov; **TransmissiveBC/DirichletBC path**; smooth periodic order test; BC unit tests.
-- Success: formal order with capturing inactive; BC residual path tested.
+- Order study again across \(p \in \{2,3,4\}\) with capturing inactive.
+- Success: formal order with capturing off; BC residual path tested; periodic conservation near machine precision for mass/momentum/energy as applicable.
 
 ### Milestone 4 — Capturing baseline
 
@@ -1369,15 +1460,18 @@ test = ["Test"]
 
 ### Milestone 5 — Quantitative suite
 
-- Smooth order, Sod, Shu–Osher; reference CSV; full metrics.
+- Smooth order (\(p=2,3,4\)), Sod, Shu–Osher; **self-converged hashed reference** (see reference policy); NullCapturing-relative excess dissipation; full metrics.
 
 ### Milestone 6 — Invention loop
 
-- Registry, invent, score, hard gates.
+- Registry, invent, score, hard gates, **`candidate_status`** (`promising` / `accepted_candidate`), CLI human summary.
+- README section: **How to add a new method**.
+- VTK production for `accepted_candidate` when M7 writer exists.
 
 ### Milestone 7 — HO VTK
 
 - Discontinuous Lagrange VTU; CLI `--output`.
+- **Timing:** may begin after M3 is green for visual debugging; invent loop must not block on VTK, but `accepted_candidate` requires VTK once writer exists.
 
 ### Milestone 8 — 2D
 
@@ -1390,20 +1484,25 @@ test = ["Test"]
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | Correction sign bugs | High | Appendix C + poly/conservation/weak-form tests |
-| Order test polluted by time error | Medium | CFL=0.2; space-only refinement |
+| Order test polluted by time error | Medium | CFL=0.2; space-only refinement; multi-\(p\) studies |
 | AV breaks conservation | High | Conservative viscous form; telescoping tests |
 | VTK node order wrong in ParaView | Medium | Documented order + p=2 golden ASCII + point-count tests |
 | Hook pipeline too heavy | Low | Defaults no-op; NullCapturing zero behavior change |
 | Baseline AV form too crude | Medium | Lock params; record `av_form` in JSON |
 | Scope creep to 2D early | High | Milestone gates |
+| Noisy invent ranking | Medium | \(\delta_{\mathrm{score}}\) margin; trade-off flags; hard gates |
 
 ---
 
-## Open Questions
+## Resolved decisions (former open questions)
 
-1. **Shu–Osher reference generation details:** ship a one-off script under `test/data/generate_shu_osher_reference.jl` using a fine-grid run once available, or external classic tabulated data? *Recommendation: generate with fine \(p\) / many elements after M4 and freeze CSV + hash in `test/data/README.md`.*
-2. **CI macOS vs Ubuntu only?** *Recommendation: Ubuntu latest primary; macOS optional.*
-3. **M7 timing:** strictly after M6 vs parallel after M3 for debug visualization? *Recommendation: allow merge of VTK PRs after M3 is green; invent loop must not block visualization.*
+| # | Decision | Resolution |
+|---|----------|------------|
+| OQ1 | Shu–Osher reference | **Self-converged** fine-grid NullCapturing (or trusted) scheme + **published sanity check** + **freeze + hash + provenance**. Do not rely solely on external tables. Generator script shipped under `test/data/`. |
+| OQ2 | CI platforms | **Ubuntu primary/blocking**; macOS first-class locally; optional non-blocking macOS GHA later. |
+| OQ3 | M7 VTK timing | **Allow after M3** for visual debugging; invent loop not blocked by VTK; `accepted_candidate` requires VTK when writer available. |
+
+No open design questions remain that block Milestone 1.
 
 ---
 
@@ -1738,7 +1837,7 @@ Incremental, independently reviewable PRs. Merge order is top-to-bottom; milesto
 | **Title** | `test(m5): ship reference CSV data and provenance for discontinuous cases` |
 | **Files** | `test/data/*`, `test/data/README.md`, optional generator script |
 | **Depends on** | M4 (generator may use solver) |
-| **Description** | Freeze reference + hash; document mask windows for excess dissipation. Branch: `milestone/5-quant-suite`. |
+| **Description** | Generator script; self-convergence study; published sanity comparison; freeze CSV + SHA-256 hash + full provenance in `test/data/README.md`; document smooth masks. Branch: `milestone/5-quant-suite`. |
 
 ### PR-05.1 — Sod + Shu–Osher cases
 
@@ -1774,7 +1873,7 @@ Incremental, independently reviewable PRs. Merge order is top-to-bottom; milesto
 | **Title** | `feat(m6): frforge score and composite scoring` |
 | **Files** | `Scoring.jl`, CLI `score`, README invent guide |
 | **Depends on** | PR-06.1 |
-| **Description** | Implement \(S_i\) maps (formula version 1): relative vs absolute modes, clip formulas for dissip/shock, binary order/robustness; write `scoring_formula_version` + `summary.scores.*`; hard_gate_failures; merge M6. |
+| **Description** | Implement \(S_i\) maps (formula version 1); NullCapturing-relative excess dissipation preferred; `candidate_status` (`promising`/`accepted_candidate`); CLI human summary; README “How to add a new method”; merge M6. |
 
 ### PR-07.1 — High-order VTU writer (1D Lagrange discontinuous)
 
