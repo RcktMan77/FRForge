@@ -1,0 +1,31 @@
+# Machine-readable index for research/experiment_log.md (optional companion).
+# Authoritative narrative remains in experiment_log.md.
+schema_version: 1
+frozen_invent_scheme:
+  points: GL
+  flux: Rusanov
+  time: SSP-RK3
+entries:
+  - id: 20260803-m0-m8-platform
+    date: "2026-08-03"
+    method: null
+    candidate_status: null
+    status: archived
+  - id: 20260803-persson_av-baseline
+    date: "2026-08-03"
+    method: persson_av
+    candidate_status: baseline
+    status: baseline
+    artifacts:
+      method_report: results/invent/baseline_persson_av.json
+  - id: 20260803-scaled_persson-invent
+    date: "2026-08-03"
+    method: scaled_persson
+    baseline: persson_av
+    candidate_status: pass_gates
+    status: open
+    composite: 0.9235235558247195
+    baseline_composite: 0.918663861117966
+    artifacts:
+      method_report: results/invent/method_scaled_persson.json
+      compare: results/invent/compare_scaled_persson_vs_persson_av.json
