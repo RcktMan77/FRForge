@@ -33,8 +33,9 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 |--------|-------------------|
 | **Completed** | **M0–M8** — 1D/2D FR laboratory, invent/score, HO VTK |
 | **In progress** | **Phase 2** — Research infrastructure & robustness |
-| **Completed** | **P2.1** Experiment log · **P2.2** Base schemes |
-| Next | **P2.3** Robustness matrix |
+| **Completed** | **Phase 2** (experiment log · schemes · robustness matrix) |
+| **In progress** | **Phase 3** — Scientific & geometric extensions |
+| Next | **P3.1** Richer 2D capturing |
 
 ### Milestone roadmap (M0–M8 complete)
 

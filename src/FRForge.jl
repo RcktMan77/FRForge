@@ -42,9 +42,10 @@ include("equations/Euler2D.jl")
 include("flux/Rusanov.jl")
 include("flux/HLLC.jl")
 
-# --- Capturing hooks + Persson AV baseline ---
+# --- Capturing hooks + Persson AV baseline (1D + 2D) ---
 include("capturing/Interfaces.jl")
 include("capturing/PerssonAV.jl")
+include("capturing/PerssonAV2D.jl")
 
 register_method!("persson_av", (; kwargs...) -> PerssonAVMethod(; kwargs...))
 include("methods/Registry.jl")
@@ -113,7 +114,8 @@ export default_persson_params, method_params
 export get_capturing_method, register_method!, METHOD_REGISTRY
 export sense!, apply_dissipation!, preprocess_state!, extrapolate_interface!
 export numerical_flux_method, post_step!
-export viscous_mass_residual_scale
+export viscous_mass_residual_scale, viscous_mass_residual_scale_2d
+export sensor_field_2d, element_viscosities_2d, element_max_wavespeed_2d
 
 export residual!, ssp_rk3!, ssp_rk3_step!, ssp_rk2!, ssp_rk2_step!, integrate!, compute_dt
 export l2_error_all
@@ -132,7 +134,7 @@ export sample_solution_1d, shock_thickness_sp, excess_dissipation, smooth_region
 export observed_orders, order_pass, solution_extrema, overshoot_metric
 
 export run_advection2d_smooth_order, run_euler2d_smooth_order, run_euler2d_discontinuous
-export run_m8_2d_suite
+export run_m8_2d_suite, run_p31_2d_capturing_suite
 
 export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report

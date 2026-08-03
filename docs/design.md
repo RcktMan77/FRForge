@@ -1230,6 +1230,16 @@ Do **not** rely solely on external tabulated data.
 - CLI: `--points`, `--flux`, `--time` on `test` / `run`.
 - **CI tier:** defaults only in required CI; non-default axes in full/nightly or targeted unit tests (this package).
 
+### 2D capturing (Phase 3.1+)
+
+Tensor-product Cartesian FR residual runs the same staged hooks as 1D:
+`preprocess_state!` → face traces / flux → volume FR → `sense!` + `apply_dissipation!`.
+
+- **Sensor:** 2D Persson modal indicator on ``\\hat{U}=V^{-1}UV^{-T}``; high-mode energy from highest Legendre index in ξ or η.
+- **AV:** element scalar ``\\varepsilon_e = c_{av}\\sigma_e (h/p)\\lambda_{\\max}`` with ``h=\\min(\\Delta x,\\Delta y)``; default **BR0** lift in both directions (`element_local_DD` alternative).
+- **CI tier:** `run_p31_2d_capturing_suite` / `frforge test --suite 2d_capturing` uses reduced meshes; full Double Mach etc. deferred to later Phase 3.
+- Residual still never hard-wires method type names.
+
 ### Robustness matrix (Phase 2.3+)
 
 Re-evaluate short-listed methods across scheme axes before any publication-grade claim.

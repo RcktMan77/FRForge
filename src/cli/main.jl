@@ -241,6 +241,11 @@ function cli_test(opts::AbstractDict)
         cases, overall_pass, hard_fails, _, _ = run_m8_2d_suite()
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+    elseif suite in ("2d_capturing", "p31")
+        cases, overall_pass, hard_fails = run_p31_2d_capturing_suite()
+        diverged = any(c -> get(c, "diverged", false) === true, cases)
+        nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+        method = "persson_av"
     elseif suite == "full"
         c1, p1, f1 = run_m1_advection_suite()
         c2, p2, f2 = run_m2_burgers_suite()
