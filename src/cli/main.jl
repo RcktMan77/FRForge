@@ -7,18 +7,15 @@ function _print_usage(io=stderr)
     println(io, "Commands:")
     println(io, "  test    Run verification suite and emit JSON report")
     println(io, "  run     Run a single case")
-    println(io, "  invent  Propose/score a capturing method vs baseline (Milestone 6)")
-    println(io, "  score   Score two existing reports (Milestone 6)")
+    println(io, "  invent  Run quant suite for a method vs baseline and classify candidate")
+    println(io, "  score   Classify two existing JSON reports (method vs baseline)")
     println(io)
     println(io, "Examples:")
-    println(io, "  frforge test --suite smoke --report results/smoke/report.json")
-    println(io, "  frforge test --suite advection --report results/m1/report.json")
-    println(io, "  frforge test --suite burgers --report results/m2/report.json")
-    println(io, "  frforge test --suite euler --report results/m3/report.json")
-    println(io, "  frforge test --suite capturing --report results/m4/report.json")
     println(io, "  frforge test --suite quant --method persson_av --report results/m5/report.json")
+    println(io, "  frforge invent --method scaled_persson --baseline persson_av")
+    println(io, "  frforge score --method-report a.json --baseline-report b.json")
     println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
-    println(io, "  frforge run --case shu_osher --p 2 --ne 80 --method persson_av --t-final 1.8")
+    println(io, describe_methods())
 end
 
 function _parse_test_args(args)
@@ -35,8 +32,64 @@ function _parse_test_args(args)
         help = "Suite: smoke|advection|burgers|euler|capturing|quant|m5|full"
         default = "advection"
         "--method"
-        help = "Capturing method name: null | persson_av"
+        help = "Capturing method name (see frforge --help for registry)"
         default = "null"
+    end
+    return parse_args(args, s)
+end
+
+function _parse_invent_args(args)
+    s = ArgParseSettings(
+        description="Invent: run quant suite for method vs baseline and classify.",
+        prog="frforge invent",
+    )
+    @add_arg_table! s begin
+        "--method", "-m"
+        help = "Candidate method name (registered)"
+        required = true
+        "--baseline", "-b"
+        help = "Baseline method name"
+        default = "persson_av"
+        "--report-dir"
+        help = "Directory for invent JSON artifacts"
+        default = "results/invent"
+        dest_name = "report_dir"
+        "--delta"
+        help = "Composite margin δ_score for promising status"
+        arg_type = Float64
+        default = DEFAULT_SCORE_MARGIN
+        "--vtk-produced"
+        help = "Set true if HO VTK was produced (accepted_candidate)"
+        action = :store_true
+        dest_name = "vtk_produced"
+    end
+    return parse_args(args, s)
+end
+
+function _parse_score_args(args)
+    s = ArgParseSettings(
+        description="Score two existing reports (method vs baseline).",
+        prog="frforge score",
+    )
+    @add_arg_table! s begin
+        "--method-report"
+        help = "Path to method report JSON"
+        required = true
+        dest_name = "method_report"
+        "--baseline-report"
+        help = "Path to baseline report JSON"
+        required = true
+        dest_name = "baseline_report"
+        "--delta"
+        help = "Composite margin δ_score"
+        arg_type = Float64
+        default = DEFAULT_SCORE_MARGIN
+        "--vtk-produced"
+        action = :store_true
+        dest_name = "vtk_produced"
+        "--output", "-o"
+        help = "Optional path for comparison JSON"
+        default = ""
     end
     return parse_args(args, s)
 end
@@ -294,14 +347,35 @@ function cli_run(args)
     end
 end
 
-function cli_invent(_opts)
-    println(stderr, "frforge invent is not available until Milestone 6.")
-    return 2
+function cli_invent(args)
+    opts = _parse_invent_args(args)
+    method = opts["method"]
+    baseline = opts["baseline"]
+    haskey(METHOD_REGISTRY, method) || error("Unknown method \"$method\". $(describe_methods())")
+    haskey(METHOD_REGISTRY, baseline) || error("Unknown baseline \"$baseline\".")
+    met, bas, cmp = invent_method(
+        method;
+        baseline=baseline,
+        report_dir=opts["report_dir"],
+        δ=opts["delta"],
+        vtk_produced=opts["vtk_produced"],
+    )
+    status = cmp["candidate_status"]
+    # Exit 0 for promising/accepted/pass_gates; 1 for rejected
+    return status == "rejected" ? 1 : 0
 end
 
-function cli_score(_opts)
-    println(stderr, "frforge score is not available until Milestone 6.")
-    return 2
+function cli_score(args)
+    opts = _parse_score_args(args)
+    out = isempty(opts["output"]) ? nothing : opts["output"]
+    cmp = score_reports(
+        opts["method_report"],
+        opts["baseline_report"];
+        δ=opts["delta"],
+        vtk_produced=opts["vtk_produced"],
+        out_path=out,
+    )
+    return cmp["candidate_status"] == "rejected" ? 1 : 0
 end
 
 """
