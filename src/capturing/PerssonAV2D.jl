@@ -77,9 +77,9 @@ function element_max_wavespeed_2d(eq, u_work::AbstractArray{T,4}, e::Int) where 
 end
 
 """
-Element viscosities on Cartesian Mesh2D:
+Element viscosities on Mesh2D (Cartesian or curved):
   ε_e = c_av * σ_e * (h_e / p) * λ_max,e
-with h_e = min(Δx, Δy).
+with h_e from metric characteristic length (`metrics.h_char`).
 """
 function element_viscosities_2d(
     dissip::ElementArtificialViscosity{T},
@@ -88,15 +88,15 @@ function element_viscosities_2d(
     state::SolutionState2D,
     eq,
 ) where {T}
-    mesh, ops = state.mesh, state.ops
+    ops = state.ops
     p = max(ops.p, 1)
     Nel = size(u_work, 3)
     ε = zeros(T, Nel)
+    hchar = state.metrics.h_char
     @inbounds for e in 1:Nel
         σe = σ[e]
         σe <= zero(T) && continue
-        jx, jy = element_coords(mesh, e)
-        h = min(mesh.Δx[jx], mesh.Δy[jy])
+        h = hchar[e]
         λ = element_max_wavespeed_2d(eq, u_work, e)
         ε[e] = dissip.c_av * σe * (h / T(p)) * λ
     end

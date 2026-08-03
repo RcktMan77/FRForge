@@ -101,6 +101,69 @@ end
     @test length(cases) >= 3
 end
 
+@testset "P3.2 freestream Cartesian and curved" begin
+    c0 = run_freestream_preservation_2d(; p=2, nx=4, ny=4, curved=false)
+    @test c0["pass"]
+    @test c0["metrics"]["residual_max"] < 1e-12
+    # Analytic wavy metrics: free-stream residual is spectral GCL error
+    c1 = run_freestream_preservation_2d(; p=3, nx=4, ny=4, curved=true, amp=0.05, t_final=0.05)
+    @test c1["pass"]
+    @test c1["metrics"]["residual_max"] < 5e-4
+    # Convergence check: refining n reduces residual
+    c_coarse = run_freestream_preservation_2d(; p=2, nx=2, ny=2, curved=true, amp=0.05, t_final=0.02)
+    c_fine = run_freestream_preservation_2d(; p=2, nx=8, ny=8, curved=true, amp=0.05, t_final=0.02)
+    @test c_fine["metrics"]["residual_max"] < 0.25 * c_coarse["metrics"]["residual_max"]
+    @info "freestream curved res=$(c1["metrics"]["residual_max"]) err=$(c1["metrics"]["freestream_error"])"
+end
+
+@testset "P3.2 wavy mesh metrics" begin
+    ops = build_operators(2)
+    mesh = make_wavy_mesh2d(3, 3, ops; amp=0.05)
+    @test is_curved_mesh(mesh)
+    met = build_mesh_metrics(mesh, ops)
+    @test all(met.J .> 0)
+    @test met.is_curved
+    # Affine mesh metrics: J = Jx*Jy = (0.5/2)^2 = 0.0625 for 2×2 on [0,1]
+    mesh_a = Mesh2D(0.0, 1.0, 0.0, 1.0, 2, 2)
+    met_a = build_mesh_metrics(mesh_a, ops)
+    @test !met_a.is_curved
+    @test all(j -> abs(j - 0.0625) < 1e-12, met_a.J)
+    # Analytic wavy metrics preserve free-stream
+    met_w = build_mesh_metrics_analytic_wavy(mesh, ops; amp=0.05)
+    @test all(met_w.J .> 0)
+end
+
+@testset "P3.2 curved advection order" begin
+    c = run_advection2d_curved_order(; p=2, n_list=[4, 8, 16], amp=0.03, t_final=0.5)
+    @test !c["diverged"]
+    @test c["order_pass"]
+    @info "curved adv orders=$(c["observed_orders"]) L2=$(c["l2_errors"])"
+end
+
+@testset "P3.2 curved jump Null + Persson" begin
+    c0 = run_euler2d_curved_discontinuous(;
+        p=1, nx=12, ny=12, t_final=0.03, amp=0.01, cfl=0.04, method_name="null",
+    )
+    @test c0["pass"]
+    c1 = run_euler2d_curved_discontinuous(;
+        p=1,
+        nx=12,
+        ny=12,
+        t_final=0.03,
+        amp=0.01,
+        cfl=0.04,
+        method=PerssonAVMethod(; c_av=0.1),
+        method_name="persson_av",
+    )
+    @test c1["pass"]
+end
+
+@testset "P3.2 curved suite" begin
+    cases, overall, fails = run_p32_curved_suite()
+    @test overall
+    @test isempty(fails)
+end
+
 @testset "2D VTU Lagrange quad" begin
     mktempdir() do dir
         eq = LinearAdvection2D(1.0, 0.0)

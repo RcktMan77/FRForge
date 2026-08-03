@@ -35,7 +35,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **In progress** | **Phase 2** — Research infrastructure & robustness |
 | **Completed** | **Phase 2** (experiment log · schemes · robustness matrix) |
 | **In progress** | **Phase 3** — Scientific & geometric extensions |
-| Next | **P3.1** Richer 2D capturing |
+| **Completed** | **P3.1** Richer 2D capturing |
+| Next | **P3.2** Curved elements |
 
 ### Milestone roadmap (M0–M8 complete)
 

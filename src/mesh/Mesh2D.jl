@@ -1,16 +1,18 @@
-# Cartesian 2D mesh of rectangular quads.
+# Cartesian / curved 2D mesh of quadrilateral elements.
 
 """
     Mesh2D{T}
 
-Structured Cartesian mesh: `nx × ny` rectangular elements.
+Structured `nx × ny` quad mesh. Affine Cartesian by default; optional
+isoparametric high-order geometry via `geom_x`, `geom_y`, `geom_ξ`.
+
 Element index `e = (jy - 1) * nx + jx` with `jx ∈ 1:nx`, `jy ∈ 1:ny`.
 """
-struct Mesh2D{T}
+mutable struct Mesh2D{T}
     nx::Int
     ny::Int
     n_elements::Int
-    x_vertices::Vector{T}   # length nx+1
+    x_vertices::Vector{T}   # length nx+1 (computational / affine skeleton)
     y_vertices::Vector{T}   # length ny+1
     Δx::Vector{T}           # length nx
     Δy::Vector{T}           # length ny
@@ -20,6 +22,12 @@ struct Mesh2D{T}
     right_bc::AbstractBC
     bottom_bc::AbstractBC
     top_bc::AbstractBC
+    # Isoparametric geometry (nothing = pure affine from vertices)
+    geom_x::Union{Nothing,Array{T,3}}  # (Ng, Ng, Nel)
+    geom_y::Union{Nothing,Array{T,3}}
+    geom_ξ::Union{Nothing,Vector{T}}   # 1D nodes for geom Lagrange
+    # If set, physical_xy uses analytic wavy map with this amplitude
+    wavy_amp::Union{Nothing,T}
 end
 
 function Mesh2D(
@@ -38,7 +46,6 @@ function Mesh2D(
     nx >= 1 && ny >= 1 || throw(ArgumentError("nx, ny must be >= 1"))
     x_right > x_left || throw(ArgumentError("x_right > x_left required"))
     y_top > y_bottom || throw(ArgumentError("y_top > y_bottom required"))
-    # Periodic consistency
     if left_bc isa PeriodicBC || right_bc isa PeriodicBC
         (left_bc isa PeriodicBC && right_bc isa PeriodicBC) ||
             throw(ArgumentError("x-periodic requires both left and right PeriodicBC"))
@@ -65,6 +72,10 @@ function Mesh2D(
         right_bc,
         bottom_bc,
         top_bc,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
     )
 end
 
@@ -75,16 +86,6 @@ end
 function element_coords(mesh::Mesh2D, e::Int)
     jy, r = divrem(e - 1, mesh.nx)
     return r + 1, jy + 1
-end
-
-"""Physical (x,y) at reference (ξ,η) in element e."""
-function physical_xy(mesh::Mesh2D{T}, e::Int, ξ::T, η::T) where {T}
-    jx, jy = element_coords(mesh, e)
-    xL, xR = mesh.x_vertices[jx], mesh.x_vertices[jx + 1]
-    yB, yT = mesh.y_vertices[jy], mesh.y_vertices[jy + 1]
-    x = (xL + xR) / T(2) + mesh.Jx[jx] * ξ
-    y = (yB + yT) / T(2) + mesh.Jy[jy] * η
-    return x, y
 end
 
 """All SP physical coordinates as (X, Y) arrays size (Np, Np, Nel)."""
