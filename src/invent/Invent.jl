@@ -47,22 +47,14 @@ function invent_method(
     bas = run_method_report(baseline; seed=seed)
     bas["command"] = "invent"
     bas["baseline_name"] = nothing
-    bas["scheme"] = Dict(
-        "points" => FROZEN_INVENT_SCHEME.points,
-        "flux" => FROZEN_INVENT_SCHEME.flux,
-        "time" => FROZEN_INVENT_SCHEME.time,
-    )
+    bas["scheme"] = scheme_dict(DEFAULT_SCHEME)
     write_report(bas_path, bas)
 
     println("Running method suite: $method_name ...")
     met = run_method_report(method_name; seed=seed)
     met["command"] = "invent"
     met["baseline_name"] = baseline
-    met["scheme"] = Dict(
-        "points" => FROZEN_INVENT_SCHEME.points,
-        "flux" => FROZEN_INVENT_SCHEME.flux,
-        "time" => FROZEN_INVENT_SCHEME.time,
-    )
+    met["scheme"] = scheme_dict(DEFAULT_SCHEME)
     write_report(met_path, met)
 
     cmp = classify_candidate(met, bas; δ=δ, vtk_produced=vtk_produced)

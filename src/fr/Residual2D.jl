@@ -93,8 +93,9 @@ function residual!(
     fhat_S = zeros(T, Np, Neq, Nel)
     fhat_N = zeros(T, Np, Neq, Nel)
 
+    flux_kind = state.scheme.flux
     function flux_pair!(u_m, u_p, nx, ny)
-        return numerical_flux_n(eq, u_m, u_p, nx, ny)
+        return interface_flux_n(eq, u_m, u_p, nx, ny, flux_kind)
     end
 
     # Interior vertical faces

@@ -43,6 +43,15 @@ function _parse_test_args(args)
         "--method"
         help = "Capturing method name (see frforge --help for registry)"
         default = "null"
+        "--points"
+        help = "Solution points: gl (default) | gll"
+        default = "gl"
+        "--flux"
+        help = "Numerical flux: rusanov (default) | hllc"
+        default = "rusanov"
+        "--time"
+        help = "Time integrator: ssp_rk3 (default) | ssp_rk2"
+        default = "ssp_rk3"
     end
     return parse_args(args, s)
 end
@@ -150,12 +159,30 @@ function _parse_run_args(args)
         "--method"
         help = "Capturing method: null | persson_av | scaled_persson"
         default = "null"
+        "--points"
+        help = "Solution points: gl (default) | gll"
+        default = "gl"
+        "--flux"
+        help = "Numerical flux: rusanov (default) | hllc"
+        default = "rusanov"
+        "--time"
+        help = "Time integrator: ssp_rk3 (default) | ssp_rk2"
+        default = "ssp_rk3"
         "--output"
         help = "Optional high-order VTU output path (ParaView)"
         default = ""
         dest_name = "output"
     end
     return parse_args(args, s)
+end
+
+"""Build SchemeConfig from CLI option dict (points/flux/time keys)."""
+function _scheme_from_opts(opts::AbstractDict)
+    return parse_scheme(;
+        points=get(opts, "points", "gl"),
+        flux=get(opts, "flux", "rusanov"),
+        time=get(opts, "time", "ssp_rk3"),
+    )
 end
 
 """
@@ -169,6 +196,13 @@ function cli_test(opts::AbstractDict)
     report_path = opts["report"]
     suite = opts["suite"]
     method = opts["method"]
+    scheme = _scheme_from_opts(opts)
+    # Required CI / invent history use DEFAULT_SCHEME only; non-default is for local exploration
+    if scheme != DEFAULT_SCHEME
+        println(
+            "Note: non-default scheme $(scheme_dict(scheme)) — invent composite history remains frozen at DEFAULT_SCHEME.",
+        )
+    end
 
     cases = Any[]
     overall_pass = true
@@ -242,6 +276,7 @@ function cli_test(opts::AbstractDict)
         wall_time_sec=time() - t0,
         hard_gate_failures=hard_fails,
         cases=cases,
+        scheme=scheme,
     )
 
     errs = validate_report_keys(report)
@@ -307,36 +342,36 @@ function cli_run(args)
     t_final = opts["t_final"]
     cfl = opts["cfl"]
     method = get_capturing_method(opts["method"])
+    scheme = _scheme_from_opts(opts)
+    ops = build_operators(p; points=scheme.points)
 
     if case == "advection_sine"
         a = opts["a"]
         eq = LinearAdvection1D(a)
-        ops = build_operators(p)
         mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
-        state = allocate_state(mesh, ops, Val(1))
+        state = allocate_state(mesh, ops, Val(1); scheme=scheme)
         set_initial_condition!(state, x -> sin(2π * x))
         M0 = discrete_mass(state, 1)
-        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+        result = integrate!(state, eq, method, t_final; cfl=cfl)
         MT = discrete_mass(state, 1)
         err = l2_error(state, x -> sin(2π * (x - a * t_final)), 1)
-        println("case=advection_sine p=$p ne=$Ne a=$a t_final=$t_final cfl=$cfl method=$(opts["method"])")
+        println("case=advection_sine p=$p ne=$Ne a=$a t_final=$t_final cfl=$cfl method=$(opts["method"]) scheme=$(scheme_dict(scheme))")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_error=$err mass_change=$(MT - M0)")
         _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1
     elseif case == "burgers_square"
         eq = Burgers1D()
-        ops = build_operators(p)
         mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
-        state = allocate_state(mesh, ops, Val(1))
+        state = allocate_state(mesh, ops, Val(1); scheme=scheme)
         set_initial_condition!(state, x -> burgers_square_ic(x))
         u0_min, u0_max = solution_extrema(state, 1)
         M0 = discrete_mass(state, 1)
-        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+        result = integrate!(state, eq, method, t_final; cfl=cfl)
         MT = discrete_mass(state, 1)
         u_min, u_max = solution_extrema(state, 1)
         _, _, η = overshoot_metric(u_min, u_max, u0_min, u0_max)
-        println("case=burgers_square p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"])")
+        println("case=burgers_square p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"]) scheme=$(scheme_dict(scheme))")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("mass_change=$(MT - M0) u_range=[$u_min, $u_max] overshoot=$η")
         if opts["method"] == "null"
@@ -346,15 +381,14 @@ function cli_run(args)
         return result.status == :ok ? 0 : 1
     elseif case == "euler_density_wave"
         eq = Euler1D(1.4)
-        ops = build_operators(p)
         mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
-        state = allocate_state(mesh, ops, Val(3))
+        state = allocate_state(mesh, ops, Val(3); scheme=scheme)
         set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
         M0 = discrete_mass(state, 1)
-        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+        result = integrate!(state, eq, method, t_final; cfl=cfl)
         MT = discrete_mass(state, 1)
         err = l2_error(state, x -> euler_density_wave_conserved(eq, x, t_final), 1)
-        println("case=euler_density_wave p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"])")
+        println("case=euler_density_wave p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"]) scheme=$(scheme_dict(scheme))")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_density=$err mass_change=$(MT - M0) positivity=$(positivity_ok(eq, state))")
         _maybe_write_vtu(opts, state, eq)
@@ -363,11 +397,10 @@ function cli_run(args)
         tf = opts["t_final"] == 1.0 ? 0.2 : opts["t_final"]
         # Run solver again for VTU (run_sod returns metrics only)
         eq = Euler1D(1.4)
-        ops = build_operators(p)
         mesh = Mesh1D(0.0, 1.0, Ne; left_bc=TransmissiveBC(), right_bc=TransmissiveBC())
-        state = allocate_state(mesh, ops, Val(3))
+        state = allocate_state(mesh, ops, Val(3); scheme=scheme)
         set_initial_condition!(state, x -> sod_ic(eq, x))
-        result = ssp_rk3!(state, eq, method, tf; cfl=min(cfl, 0.15))
+        result = integrate!(state, eq, method, tf; cfl=min(cfl, 0.15))
         c = run_sod(;
             p=p,
             n_elements=Ne,
@@ -376,7 +409,7 @@ function cli_run(args)
             method=method,
             method_name=opts["method"],
         )
-        println("case=sod p=$p ne=$Ne t_final=$tf method=$(opts["method"])")
+        println("case=sod p=$p ne=$Ne t_final=$tf method=$(opts["method"]) scheme=$(scheme_dict(scheme))")
         println("status=$(c["pass"] ? "ok" : "fail") η=$(c["overshoot"]) δ=$(c["shock_thickness"]) Dex=$(c["excess_dissipation"])")
         println("L1_vs_exact=$(c["l1_error_vs_reference"]) positivity=$(c["positivity_ok"])")
         if result.status == :ok
@@ -386,11 +419,10 @@ function cli_run(args)
     elseif case == "shu_osher"
         tf = opts["t_final"] == 1.0 ? 1.8 : opts["t_final"]
         eq = Euler1D(1.4)
-        ops = build_operators(p)
         mesh = Mesh1D(0.0, 10.0, Ne; left_bc=TransmissiveBC(), right_bc=TransmissiveBC())
-        state = allocate_state(mesh, ops, Val(3))
+        state = allocate_state(mesh, ops, Val(3); scheme=scheme)
         set_initial_condition!(state, x -> shu_osher_ic(eq, x))
-        result = ssp_rk3!(state, eq, method, tf; cfl=cfl)
+        result = integrate!(state, eq, method, tf; cfl=cfl)
         c = run_shu_osher(;
             p=p,
             n_elements=Ne,
@@ -399,7 +431,7 @@ function cli_run(args)
             method=method,
             method_name=opts["method"],
         )
-        println("case=shu_osher p=$p ne=$Ne t_final=$tf method=$(opts["method"])")
+        println("case=shu_osher p=$p ne=$Ne t_final=$tf method=$(opts["method"]) scheme=$(scheme_dict(scheme))")
         println("status=$(c["pass"] ? "ok" : "fail") η=$(c["overshoot"]) δ=$(c["shock_thickness"]) Dex=$(c["excess_dissipation"])")
         println("positivity=$(c["positivity_ok"])")
         if result.status == :ok
@@ -409,24 +441,22 @@ function cli_run(args)
     elseif case == "advection2d"
         ax, ay = 1.0, 0.5
         eq = LinearAdvection2D(ax, ay)
-        ops = build_operators(p)
         mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, Ne, Ne)
-        state = allocate_state(mesh, ops, Val(1))
+        state = allocate_state(mesh, ops, Val(1); scheme=scheme)
         set_initial_condition!(state, (x, y) -> sin(2π * x) * sin(2π * y))
-        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+        result = integrate!(state, eq, method, t_final; cfl=cfl)
         err = l2_error(
             state,
             (x, y) -> sin(2π * (x - ax * t_final)) * sin(2π * (y - ay * t_final)),
             1,
         )
-        println("case=advection2d p=$p ne=$(Ne)x$(Ne) t_final=$t_final L2=$err status=$(result.status)")
+        println("case=advection2d p=$p ne=$(Ne)x$(Ne) t_final=$t_final L2=$err status=$(result.status) scheme=$(scheme_dict(scheme))")
         _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1
     elseif case == "euler2d_wave"
         eq = Euler2D(1.4)
-        ops = build_operators(p)
         mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, Ne, Ne)
-        state = allocate_state(mesh, ops, Val(4))
+        state = allocate_state(mesh, ops, Val(4); scheme=scheme)
         set_initial_condition!(
             state,
             (x, y) ->
@@ -438,15 +468,14 @@ function cli_run(args)
                     1.0,
                 ),
         )
-        result = ssp_rk3!(state, eq, method, t_final; cfl=min(cfl, 0.15))
+        result = integrate!(state, eq, method, t_final; cfl=min(cfl, 0.15))
         println(
-            "case=euler2d_wave p=$p ne=$(Ne)x$(Ne) t_final=$t_final status=$(result.status) pos=$(positivity_ok(eq, state))",
+            "case=euler2d_wave p=$p ne=$(Ne)x$(Ne) t_final=$t_final status=$(result.status) pos=$(positivity_ok(eq, state)) scheme=$(scheme_dict(scheme))",
         )
         _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1
     elseif case == "euler2d_jump"
         eq = Euler2D(1.4)
-        ops = build_operators(p)
         mesh = Mesh2D(
             0.0,
             1.0,
@@ -459,7 +488,7 @@ function cli_run(args)
             bottom_bc=TransmissiveBC(),
             top_bc=TransmissiveBC(),
         )
-        state = allocate_state(mesh, ops, Val(4))
+        state = allocate_state(mesh, ops, Val(4); scheme=scheme)
         set_initial_condition!(
             state,
             (x, y) ->
@@ -467,9 +496,9 @@ function cli_run(args)
                 primitives_to_conserved(eq, 0.125, 0.0, 0.0, 0.1),
         )
         tf = opts["t_final"] == 1.0 ? 0.05 : opts["t_final"]
-        result = ssp_rk3!(state, eq, method, tf; cfl=min(cfl, 0.1))
+        result = integrate!(state, eq, method, tf; cfl=min(cfl, 0.1))
         println(
-            "case=euler2d_jump p=$p ne=$(Ne)x$(Ne) t_final=$tf status=$(result.status) pos=$(positivity_ok(eq, state))",
+            "case=euler2d_jump p=$p ne=$(Ne)x$(Ne) t_final=$tf status=$(result.status) pos=$(positivity_ok(eq, state)) scheme=$(scheme_dict(scheme))",
         )
         _maybe_write_vtu(opts, state, eq)
         return result.status == :ok ? 0 : 1

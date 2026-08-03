@@ -6,16 +6,16 @@ struct InterfaceFluxes{T}
     R::Matrix{T}
 end
 
-function _resolve_flux(eq, method, uL::AbstractVector, uR::AbstractVector)
+function _resolve_flux(eq, method, uL::AbstractVector, uR::AbstractVector, flux_kind::Symbol)
     override = numerical_flux_method(method, eq, uL, uR)
     if override === nothing
-        return numerical_flux(eq, uL, uR)
+        return interface_flux(eq, uL, uR, flux_kind)
     end
     return override
 end
 
 """
-    compute_interface_fluxes(traces, mesh, eq, method, t) -> InterfaceFluxes
+    compute_interface_fluxes(traces, mesh, eq, method, t; flux_kind=:rusanov) -> InterfaceFluxes
 
 Apply BC ghosts at domain ends and compute one numerical flux per interface.
 """
@@ -24,7 +24,8 @@ function compute_interface_fluxes(
     mesh::Mesh1D{T},
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
-    t::T,
+    t::T;
+    flux_kind::Symbol=:rusanov,
 ) where {T,Neq}
     Nel = mesh.n_elements
     fL = zeros(T, Nel, Neq)
@@ -32,7 +33,7 @@ function compute_interface_fluxes(
 
     # Helper to get flux from left/right state vectors
     function flux_at(u_minus::Vector{T}, u_plus::Vector{T})
-        f = _resolve_flux(eq, method, u_minus, u_plus)
+        f = _resolve_flux(eq, method, u_minus, u_plus, flux_kind)
         return f isa AbstractVector ? collect(T, f) : T[T(f)]
     end
 
@@ -141,7 +142,14 @@ function residual!(
     traces = allocate_traces(Nel, Neq, T)
     extrapolate_interface!(traces, method, u_work, state, eq)
 
-    fhat = compute_interface_fluxes(traces, mesh, eq, method, state.t)
+    fhat = compute_interface_fluxes(
+        traces,
+        mesh,
+        eq,
+        method,
+        state.t;
+        flux_kind=state.scheme.flux,
+    )
 
     fill!(du, zero(T))
     @inbounds for e in 1:Nel

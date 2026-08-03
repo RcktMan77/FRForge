@@ -16,6 +16,11 @@ using LinearAlgebra
     end
 end
 
+@testset "build_operators default is GL" begin
+    ops = build_operators(3)
+    @test ops.points === :gl
+end
+
 @testset "Differentiation matrix poly exactness" begin
     for p in 1:5
         ops = build_operators(p)
