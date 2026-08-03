@@ -59,3 +59,29 @@ end
 
 """Absolute mass change |M(T)-M(0)|."""
 conservation_residual_absolute(M0, MT) = abs(MT - M0)
+
+"""Min/max of solution field (component `c`)."""
+function solution_extrema(state::SolutionState, c::Int=1)
+    umin = typemax(eltype(state.u))
+    umax = typemin(eltype(state.u))
+    @inbounds for e in 1:size(state.u, 2), j in 1:size(state.u, 1)
+        v = state.u[j, e, c]
+        umin = min(umin, v)
+        umax = max(umax, v)
+    end
+    return umin, umax
+end
+
+"""
+    overshoot_metric(u_min, u_max, u_ref_min, u_ref_max) -> (η_over, η_under, η)
+
+Normalized overshoot / undershoot relative to reference bounds (e.g. IC range).
+Jump scale = max(|u_ref_max - u_ref_min|, eps).
+"""
+function overshoot_metric(u_min, u_max, u_ref_min, u_ref_max)
+    Δ = max(abs(u_ref_max - u_ref_min), eps(Float64))
+    η_over = max(0.0, float(u_max) - float(u_ref_max)) / Δ
+    η_under = max(0.0, float(u_ref_min) - float(u_min)) / Δ
+    η = max(η_over, η_under)
+    return η_over, η_under, η
+end

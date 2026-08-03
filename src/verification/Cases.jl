@@ -200,3 +200,182 @@ function run_m1_advection_suite()
     overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)
     return cases, overall, hard_fails
 end
+
+# ---------------------------------------------------------------------------
+# Milestone 2 — inviscid Burgers
+# ---------------------------------------------------------------------------
+
+"""Periodic square-wave IC for Burgers oscillation demo on [0,1]."""
+function burgers_square_ic(x; u_left=1.0, u_right=0.0, x_disc=0.5)
+    return x < x_disc ? u_left : u_right
+end
+
+"""
+    run_burgers_conservation(; p, n_elements, t_final, cfl)
+
+Periodic Burgers with discontinuous IC; check mass conservation.
+"""
+function run_burgers_conservation(;
+    p::Int=3,
+    n_elements::Int=32,
+    t_final::Float64=0.15,
+    cfl::Float64=0.2,
+    method::AbstractCapturingMethod=NullCapturing(),
+)
+    t0 = time()
+    eq = Burgers1D()
+    ops = build_operators(p)
+    mesh = Mesh1D(0.0, 1.0, n_elements; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    state = allocate_state(mesh, ops, Val(1))
+    set_initial_condition!(state, x -> burgers_square_ic(x))
+    M0 = discrete_mass(state, 1)
+    result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+    MT = discrete_mass(state, 1)
+    cres = conservation_residual_relative(M0, MT)
+    abs_res = conservation_residual_absolute(M0, MT)
+    cpass = result.status == :ok && (cres <= 1e-10 || abs_res <= 1e-12)
+    diverged = result.status != :ok
+    nan_detected = diverged || has_nonfinite(state.u)
+
+    return Dict{String,Any}(
+        "name" => "burgers_conservation_p$(p)",
+        "case_type" => "other",
+        "equation" => "burgers",
+        "p" => p,
+        "capturing_method" => "null",
+        "pass" => cpass && !diverged,
+        "diverged" => diverged,
+        "nan_detected" => nan_detected,
+        "conservation_residual" => cres,
+        "conservation_pass" => cpass,
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => true,
+        "wall_time_sec" => time() - t0,
+        "metrics" => Dict{String,Any}(
+            "mass_initial" => M0,
+            "mass_final" => MT,
+            "mass_abs_change" => abs_res,
+            "n_elements" => n_elements,
+            "n_steps" => result.n_steps,
+            "t_final" => t_final,
+        ),
+    )
+end
+
+"""
+    run_burgers_oscillation(; p, n_elements, t_final, cfl, min_overshoot)
+
+Discontinuous Burgers with pure high-order FR (NullCapturing).
+
+Success for M2 means the run completes, conserves, and **exhibits** Gibbs-type
+oscillations (overshoot above IC max or undershoot below IC min). That documents
+the failure mode that shock-capturing methods later aim to fix.
+"""
+function run_burgers_oscillation(;
+    p::Int=3,
+    n_elements::Int=32,
+    t_final::Float64=0.15,
+    cfl::Float64=0.2,
+    min_overshoot::Float64=0.02,  # require at least 2% of jump height
+    method::AbstractCapturingMethod=NullCapturing(),
+    u_left::Float64=1.0,
+    u_right::Float64=0.0,
+)
+    t0 = time()
+    eq = Burgers1D()
+    ops = build_operators(p)
+    mesh = Mesh1D(0.0, 1.0, n_elements; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    state = allocate_state(mesh, ops, Val(1))
+    set_initial_condition!(state, x -> burgers_square_ic(x; u_left=u_left, u_right=u_right))
+
+    u0_min, u0_max = solution_extrema(state, 1)
+    M0 = discrete_mass(state, 1)
+
+    result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+    MT = discrete_mass(state, 1)
+    u_min, u_max = solution_extrema(state, 1)
+    η_over, η_under, η = overshoot_metric(u_min, u_max, u0_min, u0_max)
+
+    cres = conservation_residual_relative(M0, MT)
+    abs_res = conservation_residual_absolute(M0, MT)
+    cpass = result.status == :ok && (cres <= 1e-10 || abs_res <= 1e-12)
+    diverged = result.status != :ok
+    nan_detected = diverged || has_nonfinite(state.u)
+
+    # M2 success: oscillations present (this is the expected HO failure mode)
+    oscillations_present = η >= min_overshoot
+    # Case "pass" means demo succeeded: ran, conserved, and showed oscillations
+    case_pass = cpass && !diverged && !nan_detected && oscillations_present
+
+    return Dict{String,Any}(
+        "name" => "burgers_oscillation_p$(p)",
+        "case_type" => "discontinuous",
+        "equation" => "burgers",
+        "p" => p,
+        "capturing_method" => "null",
+        "pass" => case_pass,
+        "diverged" => diverged,
+        "nan_detected" => nan_detected,
+        "conservation_residual" => cres,
+        "conservation_pass" => cpass,
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => true,  # scalar Burgers; no density constraint
+        "wall_time_sec" => time() - t0,
+        "n_elements" => n_elements,
+        "t_final" => t_final,
+        "excess_dissipation" => nothing,  # no NullCapturing reference needed for M2 demo
+        "shock_thickness" => nothing,
+        "shock_thickness_unit" => "sp_spacings",
+        "overshoot" => η,
+        "metrics" => Dict{String,Any}(
+            "mass_initial" => M0,
+            "mass_final" => MT,
+            "mass_abs_change" => abs_res,
+            "u_min" => u_min,
+            "u_max" => u_max,
+            "u0_min" => u0_min,
+            "u0_max" => u0_max,
+            "overshoot_high" => η_over,
+            "overshoot_low" => η_under,
+            "overshoot" => η,
+            "min_overshoot_required" => min_overshoot,
+            "oscillations_present" => oscillations_present,
+            "n_steps" => result.n_steps,
+            "note" => "M2 documents HO oscillatory failure of NullCapturing; oscillations are expected",
+        ),
+    )
+end
+
+"""
+    run_m2_burgers_suite() -> (cases, overall_pass, hard_gate_failures)
+
+Burgers conservation + oscillatory HO failure for p=2,3,4.
+"""
+function run_m2_burgers_suite()
+    cases = Any[]
+    hard_fails = String[]
+
+    for p in (2, 3, 4)
+        cc = run_burgers_conservation(; p=p, n_elements=32, t_final=0.15)
+        push!(cases, cc)
+        if !cc["conservation_pass"]
+            push!(hard_fails, "burgers conservation failed for p=$p: res=$(cc["conservation_residual"])")
+        end
+
+        co = run_burgers_oscillation(; p=p, n_elements=32, t_final=0.15)
+        push!(cases, co)
+        if co["diverged"] || co["nan_detected"]
+            push!(hard_fails, "burgers oscillation run diverged for p=$p")
+        elseif !co["metrics"]["oscillations_present"]
+            push!(
+                hard_fails,
+                "burgers p=$p did not show expected HO overshoot (η=$(co["overshoot"]))",
+            )
+        elseif !co["conservation_pass"]
+            push!(hard_fails, "burgers oscillation conservation failed for p=$p")
+        end
+    end
+
+    overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)
+    return cases, overall, hard_fails
+end
