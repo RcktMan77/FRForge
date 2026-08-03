@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# FRForge CLI entry point. Runs Julia with the package project and dispatches to main_cli.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec julia --project="$ROOT" -e 'using FRForge; exit(FRForge.main_cli(ARGS))' -- "$@"
