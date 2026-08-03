@@ -2,18 +2,27 @@
 
 function _print_usage(io=stderr)
     println(io, "FRForge — high-order Flux Reconstruction laboratory")
-    println(io, "Usage: frforge {test|run|invent|score} [options]")
+    println(io, "Usage: frforge {test|run|invent|score|log} [options]")
     println(io)
     println(io, "Commands:")
     println(io, "  test    Run verification suite and emit JSON report")
     println(io, "  run     Run a single case")
     println(io, "  invent  Run quant suite for a method vs baseline and classify candidate")
     println(io, "  score   Classify two existing JSON reports (method vs baseline)")
+    println(io, "  log     Experiment log: list entries or append from invent reports")
+    println(io)
+    println(io, "Agent workflow: read research/experiment_log.md before inventing methods.")
+    println(
+        io,
+        "Frozen invent scheme: $(FROZEN_INVENT_SCHEME.points) + $(FROZEN_INVENT_SCHEME.flux) + $(FROZEN_INVENT_SCHEME.time)",
+    )
     println(io)
     println(io, "Examples:")
     println(io, "  frforge test --suite quant --method persson_av --report results/m5/report.json")
     println(io, "  frforge invent --method scaled_persson --baseline persson_av")
     println(io, "  frforge score --method-report a.json --baseline-report b.json")
+    println(io, "  frforge log list")
+    println(io, "  frforge log append --method-report a.json --baseline-report b.json")
     println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
     println(io, describe_methods())
 end
@@ -62,6 +71,20 @@ function _parse_invent_args(args)
         help = "Set true if HO VTK was produced (accepted_candidate)"
         action = :store_true
         dest_name = "vtk_produced"
+        "--no-append-log"
+        help = "Do not append an entry to research/experiment_log.md"
+        action = :store_true
+        dest_name = "no_append_log"
+        "--hypothesis"
+        help = "Hypothesis text for experiment log entry"
+        default = ""
+        "--lessons"
+        help = "Lessons text for experiment log entry (required for promising+)"
+        default = ""
+        "--log-path"
+        help = "Override experiment log path (default: research/experiment_log.md)"
+        default = ""
+        dest_name = "log_path"
     end
     return parse_args(args, s)
 end
@@ -462,16 +485,119 @@ function cli_invent(args)
     baseline = opts["baseline"]
     haskey(METHOD_REGISTRY, method) || error("Unknown method \"$method\". $(describe_methods())")
     haskey(METHOD_REGISTRY, baseline) || error("Unknown baseline \"$baseline\".")
+    log_path = isempty(opts["log_path"]) ? nothing : opts["log_path"]
     met, bas, cmp = invent_method(
         method;
         baseline=baseline,
         report_dir=opts["report_dir"],
         δ=opts["delta"],
         vtk_produced=opts["vtk_produced"],
+        append_log=!opts["no_append_log"],
+        log_path=log_path,
+        hypothesis=opts["hypothesis"],
+        lessons=opts["lessons"],
     )
     status = cmp["candidate_status"]
     # Exit 0 for promising/accepted/pass_gates; 1 for rejected
     return status == "rejected" ? 1 : 0
+end
+
+function _parse_log_args(args)
+    if isempty(args) || args[1] in ("-h", "--help", "help")
+        return Dict("sub" => "help")
+    end
+    sub = args[1]
+    rest = args[2:end]
+    if sub == "list"
+        s = ArgParseSettings(description="List experiment log entry ids.", prog="frforge log list")
+        @add_arg_table! s begin
+            "--path"
+            help = "Path to experiment_log.md"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "list"
+        return opts
+    elseif sub == "append"
+        s = ArgParseSettings(
+            description="Append experiment log entry from two invent JSON reports.",
+            prog="frforge log append",
+        )
+        @add_arg_table! s begin
+            "--method-report"
+            help = "Path to method report JSON"
+            required = true
+            dest_name = "method_report"
+            "--baseline-report"
+            help = "Path to baseline report JSON"
+            required = true
+            dest_name = "baseline_report"
+            "--path"
+            help = "Path to experiment_log.md"
+            default = ""
+            "--hypothesis"
+            default = ""
+            "--lessons"
+            default = ""
+            "--delta"
+            arg_type = Float64
+            default = DEFAULT_SCORE_MARGIN
+            "--vtk-produced"
+            action = :store_true
+            dest_name = "vtk_produced"
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "append"
+        return opts
+    else
+        return Dict("sub" => "unknown", "cmd" => sub)
+    end
+end
+
+function cli_log(args)
+    opts = _parse_log_args(args)
+    sub = opts["sub"]
+    if sub == "help"
+        println("Usage: frforge log {list|append} [options]")
+        println("  list    List entry ids in research/experiment_log.md")
+        println("  append  Append from --method-report and --baseline-report")
+        return 0
+    elseif sub == "list"
+        path = isempty(get(opts, "path", "")) ? default_experiment_log_path() : opts["path"]
+        ids = list_experiment_entry_ids(path)
+        println("Experiment log: $path")
+        println("n_entries=$(length(ids))")
+        for id in ids
+            println("  - ", id)
+        end
+        return 0
+    elseif sub == "append"
+        path = isempty(get(opts, "path", "")) ? default_experiment_log_path() : opts["path"]
+        met = load_report(opts["method_report"])
+        bas = load_report(opts["baseline_report"])
+        cmp = classify_candidate(met, bas; δ=opts["delta"], vtk_produced=opts["vtk_produced"])
+        method_name = string(get(met, "method_name", "method"))
+        arts = Dict{String,Any}(
+            "method_report" => opts["method_report"],
+            "baseline_report" => opts["baseline_report"],
+        )
+        entry = invent_append_log!(
+            method_name,
+            met,
+            bas,
+            cmp;
+            log_path=path,
+            yaml_path=nothing,
+            artifacts=arts,
+            hypothesis=opts["hypothesis"],
+            lessons=opts["lessons"],
+        )
+        println("Appended $(entry["id"]) → $path")
+        return 0
+    else
+        println(stderr, "Unknown log subcommand: ", get(opts, "cmd", sub))
+        return 2
+    end
 end
 
 function cli_score(args)
@@ -510,6 +636,8 @@ function main_cli(args=ARGS)
             return cli_invent(rest)
         elseif cmd == "score"
             return cli_score(rest)
+        elseif cmd == "log"
+            return cli_log(rest)
         else
             println(stderr, "Unknown command: $cmd")
             _print_usage()
