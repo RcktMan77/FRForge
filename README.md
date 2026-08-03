@@ -35,7 +35,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **1 — 1D FR linear advection** |
 | **Completed** | **2 — 1D inviscid Burgers** |
 | **Completed** | **3 — 1D Euler + smooth order tests** |
-| **Next** | **4 — Pluggable shock-capturing interface** |
+| **Completed** | **4 — Pluggable shock-capturing interface** |
+| **Next** | **5 — Quantitative test suite & reporting** |
 
 ### Milestone roadmap
 
@@ -96,9 +97,13 @@ Works on macOS and Linux with the same commands.
 # Milestone 3: Euler density-wave order + BC freestream tests
 ./bin/frforge test --suite euler --report results/m3/report.json
 
+# Milestone 4: Persson AV baseline vs NullCapturing on Burgers
+./bin/frforge test --suite capturing --report results/m4/report.json
+
 # Single runs
 ./bin/frforge run --case advection_sine --p 3 --ne 16
-./bin/frforge run --case burgers_square --p 3 --ne 32 --t-final 0.15
+./bin/frforge run --case burgers_square --p 3 --ne 32 --t-final 0.15 --method null
+./bin/frforge run --case burgers_square --p 3 --ne 32 --t-final 0.15 --method persson_av
 ./bin/frforge run --case euler_density_wave --p 3 --ne 16
 
 # Help
@@ -107,8 +112,8 @@ Works on macOS and Linux with the same commands.
 
 | Command | Purpose | Available |
 |---------|---------|-----------|
-| `frforge test [--report PATH] [--suite smoke\|advection\|burgers\|euler\|full]` | Verification → JSON | M0+ |
-| `frforge run --case advection_sine \| burgers_square \| euler_density_wave` | Single run | M1–M3 |
+| `frforge test [--report PATH] [--suite smoke\|advection\|burgers\|euler\|capturing\|full]` | Verification → JSON | M0+ |
+| `frforge run --case … [--method null\|persson_av]` | Single run | M1–M4 |
 | `frforge invent ...` | Method vs baseline | M6 |
 | `frforge score ...` | Score two reports | M6 |
 

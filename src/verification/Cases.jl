@@ -205,11 +205,15 @@ end
 # Milestone 2 — inviscid Burgers
 # ---------------------------------------------------------------------------
 
-"""Periodic square-wave IC for Burgers oscillation demo on [0,1]."""
-function burgers_square_ic(x; u_left=1.0, u_right=0.0, x_disc=0.5)
+"""Periodic square-wave IC for Burgers oscillation demo on [0,1].
+
+`x_disc` should not sit exactly on an element face when using modal sensors
+(otherwise each element is piecewise constant and the Persson indicator is zero).
+Default 1/3 places the jump inside an element for typical even meshes.
+"""
+function burgers_square_ic(x; u_left=1.0, u_right=0.0, x_disc=1 / 3)
     return x < x_disc ? u_left : u_right
 end
-
 """
     run_burgers_conservation(; p, n_elements, t_final, cfl)
 
@@ -719,6 +723,174 @@ function run_m3_euler_suite()
     push!(cases, bd)
     if !bd["pass"]
         push!(hard_fails, "dirichlet BC freestream test failed")
+    end
+
+    overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)
+    return cases, overall, hard_fails
+end
+
+# ---------------------------------------------------------------------------
+# Milestone 4 — capturing interface + Persson AV baseline
+# ---------------------------------------------------------------------------
+
+"""
+    run_persson_vs_null_burgers(; p, n_elements, t_final)
+
+Compare NullCapturing vs PerssonAV on discontinuous Burgers.
+Success: both run; Persson reduces overshoot vs null; conservation holds for both.
+"""
+function run_persson_vs_null_burgers(;
+    p::Int=3,
+    n_elements::Int=32,
+    t_final::Float64=0.15,
+    cfl::Float64=0.2,
+)
+    t0 = time()
+    c_null = run_burgers_oscillation(;
+        p=p,
+        n_elements=n_elements,
+        t_final=t_final,
+        cfl=cfl,
+        method=NullCapturing(),
+    )
+    # Rename for clarity in report
+    c_null = deepcopy(c_null)
+    c_null["name"] = "burgers_null_p$(p)"
+    c_null["capturing_method"] = "null"
+    c_null["method_params"] = method_params(NullCapturing())
+
+    eq = Burgers1D()
+    ops = build_operators(p)
+    mesh = Mesh1D(0.0, 1.0, n_elements; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    state = allocate_state(mesh, ops, Val(1))
+    set_initial_condition!(state, x -> burgers_square_ic(x))
+    u0_min, u0_max = solution_extrema(state, 1)
+    M0 = discrete_mass(state, 1)
+    method = PerssonAVMethod()
+    # AV stiffens the residual; use a slightly tighter CFL than pure hyperbolic
+    result = ssp_rk3!(state, eq, method, t_final; cfl=min(cfl, 0.1))
+    MT = discrete_mass(state, 1)
+    u_min, u_max = solution_extrema(state, 1)
+    _, _, η = overshoot_metric(u_min, u_max, u0_min, u0_max)
+    cres = conservation_residual_relative(M0, MT)
+    abs_res = conservation_residual_absolute(M0, MT)
+    cpass = result.status == :ok && (cres <= 1e-9 || abs_res <= 1e-11)
+    diverged = result.status != :ok
+    nan_detected = diverged || has_nonfinite(state.u)
+    η_null = c_null["overshoot"]
+    reduced = η < η_null  # Persson should damp oscillations relative to null
+    # Soft requirement: either reduced overshoot OR sensor activated (σ mean > 0)
+    # Hard: run stable + conserve
+    case_pass = cpass && !diverged && !nan_detected
+
+    c_pers = Dict{String,Any}(
+        "name" => "burgers_persson_av_p$(p)",
+        "case_type" => "discontinuous",
+        "equation" => "burgers",
+        "p" => p,
+        "capturing_method" => "persson_av",
+        "pass" => case_pass,
+        "diverged" => diverged,
+        "nan_detected" => nan_detected,
+        "conservation_residual" => cres,
+        "conservation_pass" => cpass,
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => true,
+        "wall_time_sec" => time() - t0,
+        "n_elements" => n_elements,
+        "t_final" => t_final,
+        "excess_dissipation" => nothing,
+        "shock_thickness" => nothing,
+        "shock_thickness_unit" => "sp_spacings",
+        "overshoot" => η,
+        "method_params" => method_params(method),
+        "metrics" => Dict{String,Any}(
+            "overshoot" => η,
+            "overshoot_null" => η_null,
+            "overshoot_reduced_vs_null" => reduced,
+            "mass_abs_change" => abs_res,
+            "n_steps" => result.n_steps,
+            "av_form" => method.dissip.av_form,
+        ),
+    )
+
+    # Comparison summary case
+    both_ok = c_null["pass"] && c_pers["pass"] && reduced
+    c_cmp = Dict{String,Any}(
+        "name" => "burgers_persson_vs_null_p$(p)",
+        "case_type" => "other",
+        "equation" => "burgers",
+        "p" => p,
+        "capturing_method" => "persson_av",
+        "pass" => both_ok,
+        "diverged" => false,
+        "nan_detected" => false,
+        "conservation_residual" => max(c_null["conservation_residual"], c_pers["conservation_residual"]),
+        "conservation_pass" => c_null["conservation_pass"] && c_pers["conservation_pass"],
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => true,
+        "wall_time_sec" => time() - t0,
+        "metrics" => Dict{String,Any}(
+            "overshoot_null" => η_null,
+            "overshoot_persson" => η,
+            "overshoot_reduced" => reduced,
+            "note" => "M4 baseline: Persson AV should reduce HO overshoot vs NullCapturing",
+        ),
+    )
+
+    return c_null, c_pers, c_cmp
+end
+
+"""
+    run_m4_capturing_suite() -> (cases, overall_pass, hard_gate_failures)
+"""
+function run_m4_capturing_suite()
+    cases = Any[]
+    hard_fails = String[]
+
+    # Viscous operator mass residual (constants) on a sample mesh
+    ops = build_operators(3)
+    mesh = Mesh1D(0.0, 1.0, 8)
+    mass_res = viscous_mass_residual_scale(ops, mesh)
+    c_mass = Dict{String,Any}(
+        "name" => "av_conservative_br0_mass_check",
+        "case_type" => "other",
+        "equation" => "operator",
+        "p" => 3,
+        "capturing_method" => "persson_av",
+        "pass" => mass_res < 1e-12,
+        "diverged" => false,
+        "nan_detected" => false,
+        "conservation_residual" => mass_res,
+        "conservation_pass" => mass_res < 1e-12,
+        "conservation_metric" => "periodic_mass_change",
+        "positivity_ok" => true,
+        "wall_time_sec" => 0.0,
+        "metrics" => Dict{String,Any}(
+            "weighted_mass_of_AV_on_constant" => mass_res,
+            "av_form" => "conservative_br0",
+        ),
+    )
+    push!(cases, c_mass)
+    if !c_mass["pass"]
+        push!(hard_fails, "conservative_br0 AV does not annihilate constants in mass sense: $mass_res")
+    end
+
+    for p in (2, 3, 4)
+        c_null, c_pers, c_cmp = run_persson_vs_null_burgers(; p=p)
+        push!(cases, c_null, c_pers, c_cmp)
+        if !c_pers["conservation_pass"]
+            push!(hard_fails, "PerssonAV conservation failed p=$p")
+        end
+        if c_pers["diverged"]
+            push!(hard_fails, "PerssonAV diverged p=$p")
+        end
+        if !c_cmp["metrics"]["overshoot_reduced"]
+            push!(
+                hard_fails,
+                "PerssonAV did not reduce overshoot vs null for p=$p (null=$(c_cmp["metrics"]["overshoot_null"]), pers=$(c_cmp["metrics"]["overshoot_persson"]))",
+            )
+        end
     end
 
     overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)
