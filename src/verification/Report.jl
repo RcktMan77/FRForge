@@ -66,10 +66,16 @@ function report_skeleton(;
     wall_time_sec::Real = 0.0,
     hard_gate_failures = String[],
     cases = Any[],
+    fill_scores::Bool = true,
 )
     n_cases = length(cases)
     n_passed = count(c -> get(c, "pass", false) === true, cases)
     n_failed = n_cases - n_passed
+
+    scores = empty_scores()
+    if fill_scores && n_cases > 0
+        scores = score_suite_absolute(cases)
+    end
 
     return Dict{String,Any}(
         "schema_version" => SCHEMA_VERSION,
@@ -95,7 +101,7 @@ function report_skeleton(;
             "n_cases" => n_cases,
             "n_passed" => n_passed,
             "n_failed" => n_failed,
-            "scores" => empty_scores(),
+            "scores" => scores,
         ),
     )
 end

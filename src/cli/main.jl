@@ -16,9 +16,9 @@ function _print_usage(io=stderr)
     println(io, "  frforge test --suite burgers --report results/m2/report.json")
     println(io, "  frforge test --suite euler --report results/m3/report.json")
     println(io, "  frforge test --suite capturing --report results/m4/report.json")
-    println(io, "  frforge run --case advection_sine --p 3 --ne 16")
-    println(io, "  frforge run --case burgers_square --p 3 --ne 32 --method persson_av")
-    println(io, "  frforge run --case euler_density_wave --p 3 --ne 16")
+    println(io, "  frforge test --suite quant --method persson_av --report results/m5/report.json")
+    println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
+    println(io, "  frforge run --case shu_osher --p 2 --ne 80 --method persson_av --t-final 1.8")
 end
 
 function _parse_test_args(args)
@@ -32,7 +32,7 @@ function _parse_test_args(args)
         default = "results/report.json"
         dest_name = "report"
         "--suite"
-        help = "Suite name: smoke | advection | burgers | euler | capturing | m4 | full"
+        help = "Suite: smoke|advection|burgers|euler|capturing|quant|m5|full"
         default = "advection"
         "--method"
         help = "Capturing method name: null | persson_av"
@@ -48,7 +48,7 @@ function _parse_run_args(args)
     )
     @add_arg_table! s begin
         "--case"
-        help = "Case name: advection_sine | burgers_square | euler_density_wave"
+        help = "Case: advection_sine|burgers_square|euler_density_wave|sod|shu_osher"
         default = "advection_sine"
         "--p"
         help = "Polynomial degree"
@@ -117,18 +117,23 @@ function cli_test(opts::AbstractDict)
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
         method = "persson_av"
+    elseif suite in ("quant", "m5")
+        cases, overall_pass, hard_fails = run_m5_quant_suite(; method_name=method)
+        diverged = any(c -> get(c, "diverged", false) === true, cases)
+        nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     elseif suite == "full"
         c1, p1, f1 = run_m1_advection_suite()
         c2, p2, f2 = run_m2_burgers_suite()
         c3, p3, f3 = run_m3_euler_suite()
         c4, p4, f4 = run_m4_capturing_suite()
-        cases = vcat(c1, c2, c3, c4)
-        hard_fails = vcat(f1, f2, f3, f4)
-        overall_pass = p1 && p2 && p3 && p4
+        c5, p5, f5 = run_m5_quant_suite(; method_name=method)
+        cases = vcat(c1, c2, c3, c4, c5)
+        hard_fails = vcat(f1, f2, f3, f4, f5)
+        overall_pass = p1 && p2 && p3 && p4 && p5
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     else
-        println(stderr, "Unknown suite: $suite (use smoke|advection|burgers|euler|capturing|full)")
+        println(stderr, "Unknown suite: $suite (use smoke|advection|burgers|euler|capturing|quant|full)")
         return 2
     end
 
@@ -165,9 +170,15 @@ function cli_test(opts::AbstractDict)
 
     println("FRForge test suite=$(suite) method=$(method)")
     println("Report written: $(abspath(report_path))")
+    sc = report["summary"]["scores"]
     println(
         "schema_version=$(report["schema_version"]) overall_pass=$(report["overall_pass"]) n_cases=$(report["summary"]["n_cases"])",
     )
+    if sc["composite"] !== nothing
+        println(
+            "scores: order=$(sc["order_preservation"]) dissip=$(sc["dissipation"]) shock=$(sc["shock_quality"]) robust=$(sc["robustness"]) composite=$(sc["composite"])",
+        )
+    end
     if !isempty(hard_fails)
         println(stderr, "Hard gate failures:")
         for f in hard_fails
@@ -180,7 +191,9 @@ function cli_test(opts::AbstractDict)
         if c["case_type"] == "smooth_order"
             extra = " orders=$(c["observed_orders"]) formal=$(c["formal_order"])"
         elseif c["case_type"] == "discontinuous" && haskey(c, "overshoot")
-            extra = " overshoot=$(c["overshoot"]) cons_res=$(c["conservation_residual"])"
+            dex = get(c, "excess_dissipation", nothing)
+            δ = get(c, "shock_thickness", nothing)
+            extra = " η=$(c["overshoot"]) δ=$(δ) Dex=$(dex)"
         elseif haskey(c, "conservation_residual")
             extra = " cons_res=$(c["conservation_residual"])"
         end
@@ -247,8 +260,36 @@ function cli_run(args)
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_density=$err mass_change=$(MT - M0) positivity=$(positivity_ok(eq, state))")
         return result.status == :ok ? 0 : 1
+    elseif case == "sod"
+        tf = opts["t_final"] == 1.0 ? 0.2 : opts["t_final"]  # default t=0.2 for Sod
+        c = run_sod(;
+            p=p,
+            n_elements=Ne,
+            t_final=tf,
+            cfl=cfl,
+            method=method,
+            method_name=opts["method"],
+        )
+        println("case=sod p=$p ne=$Ne t_final=$tf method=$(opts["method"])")
+        println("status=$(c["pass"] ? "ok" : "fail") η=$(c["overshoot"]) δ=$(c["shock_thickness"]) Dex=$(c["excess_dissipation"])")
+        println("L1_vs_exact=$(c["l1_error_vs_reference"]) positivity=$(c["positivity_ok"])")
+        return c["pass"] ? 0 : 1
+    elseif case == "shu_osher"
+        tf = opts["t_final"] == 1.0 ? 1.8 : opts["t_final"]
+        c = run_shu_osher(;
+            p=p,
+            n_elements=Ne,
+            t_final=tf,
+            cfl=cfl,
+            method=method,
+            method_name=opts["method"],
+        )
+        println("case=shu_osher p=$p ne=$Ne t_final=$tf method=$(opts["method"])")
+        println("status=$(c["pass"] ? "ok" : "fail") η=$(c["overshoot"]) δ=$(c["shock_thickness"]) Dex=$(c["excess_dissipation"])")
+        println("positivity=$(c["positivity_ok"])")
+        return c["pass"] ? 0 : 1
     else
-        println(stderr, "Unknown case: $case (supports advection_sine | burgers_square | euler_density_wave)")
+        println(stderr, "Unknown case: $case")
         return 2
     end
 end

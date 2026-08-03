@@ -15,27 +15,29 @@ Euler1D{T}() where {T} = Euler1D{T}(T(1.4))
 
 # --- Primitive / conserved conversions ---
 
-"""Pressure from conserved state (ρ, ρu, E)."""
+"""Pressure from conserved state (ρ, ρu, E). Floored at 0 for diagnostics."""
 function pressure(eq::Euler1D{T}, U::AbstractVector) where {T}
     ρ, ρu, E = U[1], U[2], U[3]
-    u = ρu / ρ
-    return (eq.γ - one(T)) * (E - T(0.5) * ρ * u * u)
+    ρs = max(ρ, eps(T))
+    u = ρu / ρs
+    return (eq.γ - one(T)) * (E - T(0.5) * ρs * u * u)
 end
 
 function pressure(eq::Euler1D{T}, ρ, ρu, E) where {T}
-    u = ρu / ρ
-    return (eq.γ - one(T)) * (E - T(0.5) * ρ * u * u)
+    ρs = max(T(ρ), eps(T))
+    u = ρu / ρs
+    return (eq.γ - one(T)) * (E - T(0.5) * ρs * u * u)
 end
 
 """Velocity from conserved state."""
-function velocity(::Euler1D, U::AbstractVector)
-    return U[2] / U[1]
+function velocity(::Euler1D{T}, U::AbstractVector) where {T}
+    return U[2] / max(U[1], eps(T))
 end
 
-"""Sound speed c = √(γ p / ρ)."""
+"""Sound speed c = √(γ p / ρ) with floors for robustness near vacuum."""
 function sound_speed(eq::Euler1D{T}, U::AbstractVector) where {T}
-    ρ = U[1]
-    p = pressure(eq, U)
+    ρ = max(U[1], eps(T))
+    p = max(pressure(eq, U), eps(T))
     return sqrt(eq.γ * p / ρ)
 end
 

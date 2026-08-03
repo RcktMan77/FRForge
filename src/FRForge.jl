@@ -48,6 +48,8 @@ include("time/SSP_RK3.jl")
 # --- Verification ---
 include("verification/schema_keys.jl")
 include("verification/Metrics.jl")
+include("verification/ExactSod.jl")
+include("verification/Scoring.jl")
 include("verification/Cases.jl")
 include("verification/Report.jl")
 
@@ -96,6 +98,10 @@ export run_euler_smooth_order, run_euler_conservation, run_m3_euler_suite
 export run_bc_transmissive_test, run_bc_dirichlet_test
 export euler_density_wave_conserved
 export run_persson_vs_null_burgers, run_m4_capturing_suite
+export run_sod, run_shu_osher, run_m5_quant_suite, shu_osher_ic, sod_ic
+export SodProblem, sod_exact, sod_exact_conserved
+export score_suite_absolute, apply_scores!, collect_hard_gate_failures
+export sample_solution_1d, shock_thickness_sp, excess_dissipation, smooth_region_mask
 export observed_orders, order_pass, solution_extrema, overshoot_metric
 
 end # module
