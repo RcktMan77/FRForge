@@ -1230,6 +1230,31 @@ Do **not** rely solely on external tabulated data.
 - CLI: `--points`, `--flux`, `--time` on `test` / `run`.
 - **CI tier:** defaults only in required CI; non-default axes in full/nightly or targeted unit tests (this package).
 
+### Robustness matrix (Phase 2.3+)
+
+Re-evaluate short-listed methods across scheme axes before any publication-grade claim.
+
+```
+frforge robustness --method <name> --matrix ci|full
+  → results/robustness/<method>/<points>_<flux>_<time>.json
+  → results/robustness/<method>/summary.json
+  → append research/experiment_log.md
+```
+
+| Matrix | Cells | Suite | CI tier |
+|--------|-------|-------|---------|
+| `:ci` | default + GLL×HLLC×SSP-RK3 | **light** quant | Required CI / unit tests |
+| `:full` | 2×2×2 = 8 cells | full quant | Local / nightly only |
+
+**Promotion rule** (`assess_publication_grade` → `publication_grade` only if all hold):
+
+1. **Default scheme** cell OK and invent status `promising` / `accepted_candidate`.
+2. **HLLC cells** all OK with order preserved (less-dissipative corner).
+3. **GLL cells** all OK (no divergence / NaN / hard-gate fail).
+4. **Narrative complete** (`hypothesis` + `lessons` filled — not invent placeholders).
+
+Promotion is **never** automatic from a single invent run. API: `run_robustness_matrix`, `robustness_cells`, `assess_publication_grade`.
+
 ---
 
 ### Git branching strategy

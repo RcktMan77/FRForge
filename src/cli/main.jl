@@ -2,14 +2,15 @@
 
 function _print_usage(io=stderr)
     println(io, "FRForge — high-order Flux Reconstruction laboratory")
-    println(io, "Usage: frforge {test|run|invent|score|log} [options]")
+    println(io, "Usage: frforge {test|run|invent|score|log|robustness} [options]")
     println(io)
     println(io, "Commands:")
-    println(io, "  test    Run verification suite and emit JSON report")
-    println(io, "  run     Run a single case")
-    println(io, "  invent  Run quant suite for a method vs baseline and classify candidate")
-    println(io, "  score   Classify two existing JSON reports (method vs baseline)")
-    println(io, "  log     Experiment log: list entries or append from invent reports")
+    println(io, "  test         Run verification suite and emit JSON report")
+    println(io, "  run          Run a single case")
+    println(io, "  invent       Run quant suite for a method vs baseline and classify candidate")
+    println(io, "  score        Classify two existing JSON reports (method vs baseline)")
+    println(io, "  log          Experiment log: list entries or append from invent reports")
+    println(io, "  robustness   Scheme robustness matrix (CI-light or full/nightly)")
     println(io)
     println(io, "Agent workflow: read research/experiment_log.md before inventing methods.")
     println(
@@ -22,7 +23,8 @@ function _print_usage(io=stderr)
     println(io, "  frforge invent --method scaled_persson --baseline persson_av")
     println(io, "  frforge score --method-report a.json --baseline-report b.json")
     println(io, "  frforge log list")
-    println(io, "  frforge log append --method-report a.json --baseline-report b.json")
+    println(io, "  frforge robustness --method scaled_persson --matrix ci")
+    println(io, "  frforge robustness --method scaled_persson --matrix full   # local/nightly")
     println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
     println(io, describe_methods())
 end
@@ -642,6 +644,95 @@ function cli_score(args)
     return cmp["candidate_status"] == "rejected" ? 1 : 0
 end
 
+function _parse_robustness_args(args)
+    s = ArgParseSettings(
+        description="Robustness matrix across scheme axes (points × flux × time).",
+        prog="frforge robustness",
+    )
+    @add_arg_table! s begin
+        "--method", "-m"
+        help = "Capturing method name"
+        required = true
+        "--baseline", "-b"
+        help = "Baseline method"
+        default = "persson_av"
+        "--matrix"
+        help = "Matrix size: ci (default, required-CI safe) | full (local/nightly)"
+        default = "ci"
+        "--report-dir"
+        help = "Root directory for robustness JSON"
+        default = "results/robustness"
+        dest_name = "report_dir"
+        "--delta"
+        help = "Composite margin δ for invent classification per cell"
+        arg_type = Float64
+        default = DEFAULT_SCORE_MARGIN
+        "--full-suite"
+        help = "Force full quant suite even for matrix=ci (slow; not for required CI)"
+        action = :store_true
+        dest_name = "full_suite"
+        "--light"
+        help = "Force light suite even for matrix=full"
+        action = :store_true
+        "--no-append-log"
+        help = "Do not append experiment log entry"
+        action = :store_true
+        dest_name = "no_append_log"
+        "--narrative-complete"
+        help = "Mark hypothesis/lessons as complete for promotion assessment"
+        action = :store_true
+        dest_name = "narrative_complete"
+        "--invent-status"
+        help = "Override invent status for default-scheme promotion rule (e.g. promising)"
+        default = ""
+        dest_name = "invent_status"
+        "--hypothesis"
+        default = ""
+        "--lessons"
+        default = ""
+        "--log-path"
+        default = ""
+        dest_name = "log_path"
+    end
+    return parse_args(args, s)
+end
+
+function cli_robustness(args)
+    opts = _parse_robustness_args(args)
+    method = opts["method"]
+    baseline = opts["baseline"]
+    haskey(METHOD_REGISTRY, method) || error("Unknown method \"$method\". $(describe_methods())")
+    haskey(METHOD_REGISTRY, baseline) || error("Unknown baseline \"$baseline\".")
+    matrix = Symbol(lowercase(opts["matrix"]))
+    matrix in (:ci, :full) || error("--matrix must be ci or full")
+    light = if opts["full_suite"]
+        false
+    elseif opts["light"]
+        true
+    else
+        nothing  # auto: ci→light, full→full
+    end
+    invent_status = isempty(opts["invent_status"]) ? nothing : opts["invent_status"]
+    log_path = isempty(opts["log_path"]) ? nothing : opts["log_path"]
+    summary = run_robustness_matrix(
+        method;
+        baseline=baseline,
+        matrix=matrix,
+        report_dir=opts["report_dir"],
+        light=light,
+        δ=opts["delta"],
+        append_log=!opts["no_append_log"],
+        log_path=log_path,
+        narrative_complete=opts["narrative_complete"],
+        invent_status=invent_status,
+        hypothesis=opts["hypothesis"],
+        lessons=opts["lessons"],
+    )
+    # Exit 0 if all cells ok (not necessarily publication-grade)
+    all_ok = all(c -> get(c, "ok", false) === true, summary["cells"])
+    return all_ok ? 0 : 1
+end
+
 """
     main_cli(args=ARGS) -> Int
 
@@ -667,6 +758,8 @@ function main_cli(args=ARGS)
             return cli_score(rest)
         elseif cmd == "log"
             return cli_log(rest)
+        elseif cmd == "robustness"
+            return cli_robustness(rest)
         else
             println(stderr, "Unknown command: $cmd")
             _print_usage()

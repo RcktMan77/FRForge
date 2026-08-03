@@ -3,28 +3,34 @@
 const DEFAULT_SCORE_MARGIN = 0.02
 
 """
-    run_method_report(method_name; suite=:quant, report_path=nothing) -> Dict
+    run_method_report(method_name; suite=:quant, scheme=DEFAULT_SCHEME) -> Dict
 
 Run the quantitative suite for `method_name` and return a schema v1 report dict
 with absolute scores filled.
+
+`suite`: `:quant` / `:m5` (full) or `:light` (CI / robustness reduced).
+Invent history must use `DEFAULT_SCHEME` unless a logged re-baseline is recorded.
 """
 function run_method_report(
     method_name::AbstractString;
     suite::Symbol=:quant,
     seed=nothing,
+    scheme::SchemeConfig=DEFAULT_SCHEME,
 )
     t0 = time()
-    if suite === :quant || suite === :m5
-        cases, overall, hard_fails = run_m5_quant_suite(; method_name=method_name)
+    light = suite === :light || suite === :robustness_light
+    if suite === :quant || suite === :m5 || light
+        cases, overall, hard_fails =
+            run_m5_quant_suite(; method_name=method_name, scheme=scheme, light=light)
     else
-        error("invent currently supports suite=quant only (got $suite)")
+        error("unsupported suite=$suite (use :quant, :m5, or :light)")
     end
     diverged = any(c -> get(c, "diverged", false) === true, cases)
     nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     m = get_capturing_method(method_name)
     report = report_skeleton(;
         command="invent",
-        suite=String(suite),
+        suite=light ? "light" : String(suite),
         method_name=String(method_name),
         method_params=method_params(m),
         baseline_name=nothing,
@@ -35,6 +41,7 @@ function run_method_report(
         hard_gate_failures=hard_fails,
         cases=cases,
         fill_scores=true,
+        scheme=scheme,
     )
     if seed !== nothing
         report["method_params"]["seed"] = seed

@@ -33,8 +33,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 |--------|-------------------|
 | **Completed** | **M0–M8** — 1D/2D FR laboratory, invent/score, HO VTK |
 | **In progress** | **Phase 2** — Research infrastructure & robustness |
-| **Completed** | **P2.1** Experiment log |
-| Next | **P2.2** Base schemes → **P2.3** Robustness matrix |
+| **Completed** | **P2.1** Experiment log · **P2.2** Base schemes |
+| Next | **P2.3** Robustness matrix |
 
 ### Milestone roadmap (M0–M8 complete)
 
@@ -56,7 +56,7 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 |----|------|---------|
 | P2.1 | Experiment log | `research/experiment_log.md` + invent auto-append |
 | P2.2 | Configurable schemes | GLL, HLLC, SSP-RK2; invent defaults frozen |
-| P2.3 | Robustness matrix | Short-list promotion only with matrix evidence |
+| P2.3 | Robustness matrix | `frforge robustness --matrix ci\|full`; promotion rule |
 | P3.x | Science/geometry | 2D capturing, curved elements, extra benchmarks |
 | P4 | Performance | Profile / threads after research workflow is stable |
 
