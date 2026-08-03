@@ -15,6 +15,9 @@ using ArgParse
 using Dates
 using JSON
 
+# --- Scheme config (points / flux / time axes) ---
+include("scheme/SchemeConfig.jl")
+
 # --- FR core ---
 include("fr/Points.jl")
 include("fr/Correction.jl")
@@ -37,6 +40,7 @@ include("equations/Euler2D.jl")
 
 # --- Fluxes ---
 include("flux/Rusanov.jl")
+include("flux/HLLC.jl")
 
 # --- Capturing hooks + Persson AV baseline ---
 include("capturing/Interfaces.jl")
@@ -49,6 +53,8 @@ include("methods/Registry.jl")
 include("fr/Residual.jl")
 include("fr/Residual2D.jl")
 include("time/SSP_RK3.jl")
+include("time/SSP_RK2.jl")
+include("time/Integrate.jl")
 
 # --- Verification ---
 include("verification/schema_keys.jl")
@@ -77,8 +83,10 @@ export write_report_skeleton, load_report, validate_report_keys
 export DEFAULT_SCORING_WEIGHTS, SCORING_FORMULA_VERSION, SCHEMA_VERSION
 export REQUIRED_TOP_LEVEL_KEYS, REQUIRED_SUMMARY_KEYS
 
+export SchemeConfig, DEFAULT_SCHEME, scheme_dict, parse_scheme, time_cfl_guidance
+
 export FROperators, build_operators, n_points
-export gauss_legendre_nodes_weights, differentiation_matrix
+export gauss_legendre_nodes_weights, gauss_lobatto_legendre_nodes_weights, differentiation_matrix
 export g_DG_endpoints, g_DG_values_and_derivs, legendre_P
 
 export AbstractBC, PeriodicBC, TransmissiveBC, DirichletBC
@@ -92,7 +100,7 @@ export AbstractEquation, LinearAdvection1D, Burgers1D, Euler1D
 export LinearAdvection2D, Euler2D
 export physical_flux, physical_flux_x, physical_flux_y, numerical_flux, numerical_flux_n
 export max_wave_speed, max_wave_speed_n, n_equations
-export rusanov_flux
+export rusanov_flux, hllc_flux, hllc_flux_n, interface_flux, interface_flux_n
 export pressure, velocity, sound_speed, primitives_to_conserved, conserved_to_primitives
 export positivity_ok, positivity_ok_state
 
@@ -106,7 +114,7 @@ export sense!, apply_dissipation!, preprocess_state!, extrapolate_interface!
 export numerical_flux_method, post_step!
 export viscous_mass_residual_scale
 
-export residual!, ssp_rk3!, ssp_rk3_step!, compute_dt
+export residual!, ssp_rk3!, ssp_rk3_step!, ssp_rk2!, ssp_rk2_step!, integrate!, compute_dt
 export l2_error_all
 
 export run_advection_smooth_order, run_advection_conservation, run_m1_advection_suite

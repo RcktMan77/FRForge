@@ -3,8 +3,9 @@
 **Authority:** This file is the laboratory notebook and **authoritative memory** for agents and humans.  
 **Rule:** Always **read this log before proposing a new capturing method**. Append after every invent / robustness evaluation.
 
-**Frozen invent scheme** (composite-score history): **GL + Rusanov + SSP-RK3**.  
-Do not change defaults for invent comparisons without a **logged re-baseline** entry.
+**Frozen invent scheme** (composite-score history): **GL + Rusanov + SSP-RK3** (`DEFAULT_SCHEME`).  
+Do not change defaults for invent comparisons without a **logged re-baseline** entry.  
+Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration only, not invent score history.
 
 **CI policy (one line):** Every addition declares **required CI** vs **full/nightly/manual**; required CI stays under ~10–15 min on Ubuntu; no large VTU/invent trees as PR artifacts.
 
