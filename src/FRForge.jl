@@ -59,9 +59,10 @@ include("verification/Cases.jl")
 include("verification/Cases2D.jl")
 include("verification/Report.jl")
 
-# --- Invention loop ---
+# --- Invention loop + experiment log ---
 include("invent/Experiment.jl")
 include("invent/Candidate.jl")
+include("invent/ExperimentLog.jl")
 include("invent/Invent.jl")
 
 # --- I/O ---
@@ -128,6 +129,10 @@ export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report
 export classify_candidate, print_candidate_summary, score_suite_relative
 export tradeoff_ok, DEFAULT_SCORE_MARGIN
+export FROZEN_INVENT_SCHEME, default_experiment_log_path, default_experiment_log_yaml_path
+export make_entry_id, entry_from_invent, format_entry_markdown
+export append_experiment_entry!, invent_append_log!, list_experiment_entry_ids
+export narrative_required, package_root, NARRATIVE_PLACEHOLDER
 
 export write_vtu_high_order, vtk_lagrange_line_nodes, vtk_lagrange_quad_nodes
 export vtk_point_counts_1d, vtk_point_counts_2d

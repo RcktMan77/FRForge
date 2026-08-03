@@ -29,19 +29,13 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 
 ## Current milestone
 
-| Status | Milestone |
-|--------|-----------|
-| **Completed** | **0 — Repository setup, project skeleton & verification harness** |
-| **Completed** | **1 — 1D FR linear advection** |
-| **Completed** | **2 — 1D inviscid Burgers** |
-| **Completed** | **3 — 1D Euler + smooth order tests** |
-| **Completed** | **4 — Pluggable shock-capturing interface** |
-| **Completed** | **5 — Quantitative test suite & reporting** |
-| **Completed** | **6 — Invention-oriented research loop** |
-| **Completed** | **7 — High-order VTK writer** |
-| **Completed** | **8 — 2D extension + visualization** |
+| Status | Milestone / phase |
+|--------|-------------------|
+| **Completed** | **M0–M8** — 1D/2D FR laboratory, invent/score, HO VTK |
+| **In progress** | **Phase 2** — Research infrastructure & robustness |
+| Next | **P2.1** Experiment log → **P2.2** Base schemes → **P2.3** Robustness matrix |
 
-### Milestone roadmap
+### Milestone roadmap (M0–M8 complete)
 
 | # | Name | Success criterion (summary) |
 |---|------|------------------------------|
@@ -54,6 +48,18 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | 6 | Invention loop | `invent` / `score` vs baseline; `promising` / `accepted_candidate` status |
 | 7 | High-order VTK writer | ParaView-ready HO VTU (may start after M3 for debug) |
 | 8 | 2D + visualization | 2D order tests + HO VTK |
+
+### Phase 2+ (post-M8)
+
+| ID | Name | Summary |
+|----|------|---------|
+| P2.1 | Experiment log | `research/experiment_log.md` + invent auto-append |
+| P2.2 | Configurable schemes | GLL, HLLC, SSP-RK2; invent defaults frozen |
+| P2.3 | Robustness matrix | Short-list promotion only with matrix evidence |
+| P3.x | Science/geometry | 2D capturing, curved elements, extra benchmarks |
+| P4 | Performance | Profile / threads after research workflow is stable |
+
+**Agent invent workflow:** (1) read [`research/experiment_log.md`](research/experiment_log.md); (2) implement under `src/methods/`; (3) `frforge invent --method …`; (4) fill hypothesis/lessons if promising+.
 
 ---
 
@@ -69,6 +75,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Ubuntu (GitHub Actions)** | **Primary / required / blocking** CI on PRs to `develop` and `main` (Julia 1.10 and 1.11) |
 | **macOS (local)** | **First-class** for development and verification — the dependency set (stdlib, JSON, ArgParse) is highly portable |
 | **macOS (GHA)** | Optional, non-blocking job later once core milestones are stable — not required for early milestones |
+
+**CI two-tier policy:** Every addition declares **required CI** vs **full/nightly/manual**. Required CI = default scheme only, modest grids, reduced Shu–Osher; **no** full robustness matrix or heavy 2D benchmarks. Budget: **~10–15 min** on Ubuntu. No large VTU/invent trees as PR artifacts.
 
 ---
 

@@ -1186,6 +1186,35 @@ Do **not** rely solely on external tabulated data.
 | **macOS local** | **First-class** for development and verification; dependency set (JSON, ArgParse, stdlib) is highly portable. Document setup in README. |
 | **macOS GHA** | **Optional**, non-blocking or later-required job once core milestones are stable (post–M3 or post–M5). Not required for M0–M2. |
 
+### CI two-tier policy (Phase 2+)
+
+**One-line policy:** Every addition must declare **required CI** vs **full/nightly/manual**; required CI stays within budget; heavy work never blocks PRs.
+
+| Tier | When | Contents |
+|------|------|----------|
+| **Required CI** (PR / merge gate) | Every PR to `develop`/`main` | Fast subset only: **default invent scheme** (GL + Rusanov + SSP-RK3), modest \(p\) and \(N_e\), **reduced** Shu–Osher, **no** full robustness matrix, **no** Double Mach / forward-step, **no** large VTU or invent JSON trees as artifacts |
+| **Full / nightly / manual** | Local or scheduled | Complete robustness matrix, higher-resolution cases, longer-time runs, optional heavy benchmarks |
+
+**Hard time budget:** required CI should finish in **~10–15 minutes** on Ubuntu (ideally less). New cases that would break the budget ship **CI-light** variants or go full/nightly only.
+
+**Artifact control:** do not upload large VTU files or full invent JSON trees on every PR; keep CI artifacts minimal.
+
+**PR checklist addition:** declare whether each new case/feature is **required CI** or **full/nightly/manual**.
+
+---
+
+### Experiment log (Phase 2.1+)
+
+**Authority:** `research/experiment_log.md` is the laboratory notebook and **authoritative memory** for agents. Optional index: `research/experiment_log.yaml`.
+
+**Agent rule:** Always **read the experiment log before proposing a new capturing method**. After invent/score, append results (auto-append from `frforge invent`).
+
+**Frozen invent scheme:** composite-score history uses **GL + Rusanov + SSP-RK3** only, unless a **logged re-baseline** entry is recorded.
+
+**Narrative rule:** For `promising` or higher, **`hypothesis` and `lessons` are required** (no placeholders) before shortlist / publication-grade claims.
+
+**API:** `append_experiment_entry!`, `invent_append_log!`, `entry_from_invent`, `frforge log list|append`.
+
 ---
 
 ### Git branching strategy
