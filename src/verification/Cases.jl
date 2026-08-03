@@ -423,10 +423,11 @@ function run_euler_smooth_order(;
     order_tol::Float64=DEFAULT_ORDER_TOLERANCE,
     γ::Float64=1.4,
     method::AbstractCapturingMethod=NullCapturing(),
+    scheme::SchemeConfig=DEFAULT_SCHEME,
 )
     t0 = time()
     eq = Euler1D(γ)
-    ops = build_operators(p)
+    ops = build_operators(p; points=scheme.points)
     formal = p + 1
     Ne_fine = maximum(n_elements_list)
     λ_max = 2.5
@@ -442,9 +443,9 @@ function run_euler_smooth_order(;
 
     for Ne in n_elements_list
         mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
-        state = allocate_state(mesh, ops, Val(3))
+        state = allocate_state(mesh, ops, Val(3); scheme=scheme)
         set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
-        result = ssp_rk3!(state, eq, method, t_final; dt=dt_fixed)
+        result = integrate!(state, eq, method, t_final; dt=dt_fixed)
         if result.status != :ok
             diverged = true
             nan_detected = true
@@ -466,10 +467,10 @@ function run_euler_smooth_order(;
 
     Ne = n_elements_list[end]
     mesh = Mesh1D(0.0, 1.0, Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
-    state = allocate_state(mesh, ops, Val(3))
+    state = allocate_state(mesh, ops, Val(3); scheme=scheme)
     set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
     M0 = [discrete_mass(state, c) for c in 1:3]
-    result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+    result = integrate!(state, eq, method, t_final; cfl=cfl)
     MT = [discrete_mass(state, c) for c in 1:3]
     cres_comp = [conservation_residual_relative(M0[c], MT[c]) for c in 1:3]
     abs_comp = [conservation_residual_absolute(M0[c], MT[c]) for c in 1:3]
@@ -935,10 +936,11 @@ function run_sod(;
     γ::Float64=1.4,
     method::AbstractCapturingMethod=PerssonAVMethod(),
     method_name::AbstractString="persson_av",
+    scheme::SchemeConfig=DEFAULT_SCHEME,
 )
     t0 = time()
     eq = Euler1D(γ)
-    ops = build_operators(p)
+    ops = build_operators(p; points=scheme.points)
     mesh = Mesh1D(
         0.0,
         1.0,
@@ -946,12 +948,12 @@ function run_sod(;
         left_bc=TransmissiveBC(),
         right_bc=TransmissiveBC(),
     )
-    state = allocate_state(mesh, ops, Val(3))
+    state = allocate_state(mesh, ops, Val(3); scheme=scheme)
     set_initial_condition!(state, x -> sod_ic(eq, x))
     u0_min, u0_max = solution_extrema(state, 1)
     M0 = discrete_mass(state, 1)
 
-    result = ssp_rk3!(state, eq, method, t_final; cfl=min(cfl, 0.15))
+    result = integrate!(state, eq, method, t_final; cfl=min(cfl, 0.15))
     diverged = result.status != :ok
     nan_detected = diverged || has_nonfinite(state.u)
     pos = !nan_detected && positivity_ok(eq, state)
@@ -974,10 +976,10 @@ function run_sod(;
     )
     Dex_exact = excess_dissipation(x, ρ, ρ_ex; mask=mask)
 
-    # NullCapturing reference on same mesh
-    state_n = allocate_state(mesh, ops, Val(3))
+    # NullCapturing reference on same mesh / scheme
+    state_n = allocate_state(mesh, ops, Val(3); scheme=scheme)
     set_initial_condition!(state_n, x -> sod_ic(eq, x))
-    rn = ssp_rk3!(state_n, eq, NullCapturing(), t_final; cfl=min(cfl, 0.15))
+    rn = integrate!(state_n, eq, NullCapturing(), t_final; cfl=min(cfl, 0.15))
     Dex_null = nothing
     if rn.status == :ok
         _, ρn = sample_solution_1d(state_n, eq; component=:density)
@@ -1042,10 +1044,11 @@ function run_shu_osher(;
     γ::Float64=1.4,
     method::AbstractCapturingMethod=PerssonAVMethod(),
     method_name::AbstractString="persson_av",
+    scheme::SchemeConfig=DEFAULT_SCHEME,
 )
     t0 = time()
     eq = Euler1D(γ)
-    ops = build_operators(p)
+    ops = build_operators(p; points=scheme.points)
     mesh = Mesh1D(
         0.0,
         10.0,
@@ -1053,12 +1056,12 @@ function run_shu_osher(;
         left_bc=TransmissiveBC(),
         right_bc=TransmissiveBC(),
     )
-    state = allocate_state(mesh, ops, Val(3))
+    state = allocate_state(mesh, ops, Val(3); scheme=scheme)
     set_initial_condition!(state, x -> shu_osher_ic(eq, x))
     umin0, umax0 = solution_extrema(state, 1)
     M0 = discrete_mass(state, 1)
 
-    result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
+    result = integrate!(state, eq, method, t_final; cfl=cfl)
     diverged = result.status != :ok
     nan_detected = diverged || has_nonfinite(state.u)
     pos = !nan_detected && positivity_ok(eq, state)
@@ -1070,10 +1073,10 @@ function run_shu_osher(;
     # Post-shock density scale ~4 for overshoot bound
     _, _, η = overshoot_metric(umin, umax, umin0, max(umax0, 4.5))
 
-    # Null reference same mesh
-    state_n = allocate_state(mesh, ops, Val(3))
+    # Null reference same mesh / scheme
+    state_n = allocate_state(mesh, ops, Val(3); scheme=scheme)
     set_initial_condition!(state_n, x -> shu_osher_ic(eq, x))
-    rn = ssp_rk3!(state_n, eq, NullCapturing(), t_final; cfl=cfl)
+    rn = integrate!(state_n, eq, NullCapturing(), t_final; cfl=cfl)
     Dex = nothing
     if rn.status == :ok
         xn, ρn = sample_solution_1d(state_n, eq; component=:density)
@@ -1149,46 +1152,90 @@ function load_shu_osher_reference(path::AbstractString)
 end
 
 """
-    run_m5_quant_suite(; method_name="persson_av")
+    run_m5_quant_suite(; method_name="persson_av", scheme=DEFAULT_SCHEME, light=false)
 
 Quantitative suite: Euler smooth order (p=2,3) + Sod + Shu–Osher with method.
+`light=true` is the CI / robustness-matrix reduced suite (smaller meshes, short Shu–Osher).
 Returns cases, overall_pass, hard_gate_failures.
 """
-function run_m5_quant_suite(; method_name::AbstractString="persson_av")
+function run_m5_quant_suite(;
+    method_name::AbstractString="persson_av",
+    scheme::SchemeConfig=DEFAULT_SCHEME,
+    light::Bool=false,
+)
     cases = Any[]
     method = get_capturing_method(method_name)
 
-    # Smooth order (subset for runtime: p=2,3)
-    for p in (2, 3)
-        nlist = p == 2 ? [16, 32, 64] : [8, 16, 32]
-        c = run_euler_smooth_order(; p=p, n_elements_list=nlist, cfl=0.1)
-        push!(cases, c)
+    if light
+        # CI-light: one order study, coarse Sod, short Shu–Osher
+        push!(
+            cases,
+            run_euler_smooth_order(;
+                p=2,
+                n_elements_list=[16, 32],
+                cfl=0.1,
+                scheme=scheme,
+            ),
+        )
+        push!(
+            cases,
+            run_sod(;
+                p=2,
+                n_elements=32,
+                t_final=0.15,
+                method=method,
+                method_name=method_name,
+                scheme=scheme,
+            ),
+        )
+        push!(
+            cases,
+            run_shu_osher(;
+                p=1,
+                n_elements=40,
+                t_final=0.4,
+                cfl=0.1,
+                method=method isa PerssonAVMethod ?
+                      PerssonAVMethod(c_av=max(method.dissip.c_av, 0.3)) : method,
+                method_name=method_name,
+                scheme=scheme,
+            ),
+        )
+    else
+        # Smooth order (subset for runtime: p=2,3)
+        for p in (2, 3)
+            nlist = p == 2 ? [16, 32, 64] : [8, 16, 32]
+            c = run_euler_smooth_order(; p=p, n_elements_list=nlist, cfl=0.1, scheme=scheme)
+            push!(cases, c)
+        end
+
+        push!(
+            cases,
+            run_sod(;
+                p=2,
+                n_elements=64,
+                t_final=0.2,
+                method=method,
+                method_name=method_name,
+                scheme=scheme,
+            ),
+        )
+
+        # Shu–Osher: p=1 is the robust HO-start setting for explicit FR+AV on this problem
+        push!(
+            cases,
+            run_shu_osher(;
+                p=1,
+                n_elements=100,
+                t_final=1.8,
+                cfl=0.1,
+                method=method isa PerssonAVMethod ?
+                      PerssonAVMethod(c_av=max(method.dissip.c_av, 0.3)) : method,
+                method_name=method_name,
+                scheme=scheme,
+            ),
+        )
     end
-
-    # Sod with method
-    push!(
-        cases,
-        run_sod(;
-            p=2,
-            n_elements=64,
-            t_final=0.2,
-            method=method,
-            method_name=method_name,
-        ),
-    )
-
-    # Shu–Osher: p=1 is the robust HO-start setting for explicit FR+AV on this problem
-    push!(
-        cases,
-        run_shu_osher(;
-            p=1,
-            n_elements=100,
-            t_final=1.8,
-            cfl=0.1,
-            method=method isa PerssonAVMethod ? PerssonAVMethod(c_av=max(method.dissip.c_av, 0.3)) : method,
-            method_name=method_name,
-        ),
-    )
 
     hard_fails = collect_hard_gate_failures(cases)
     overall = all(c -> c["pass"] === true, cases) && isempty(hard_fails)

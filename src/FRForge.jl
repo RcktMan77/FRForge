@@ -65,11 +65,12 @@ include("verification/Cases.jl")
 include("verification/Cases2D.jl")
 include("verification/Report.jl")
 
-# --- Invention loop + experiment log ---
+# --- Invention loop + experiment log + robustness ---
 include("invent/Experiment.jl")
 include("invent/Candidate.jl")
 include("invent/ExperimentLog.jl")
 include("invent/Invent.jl")
+include("invent/Robustness.jl")
 
 # --- I/O ---
 include("io/VTKHighOrder.jl")
@@ -141,6 +142,8 @@ export FROZEN_INVENT_SCHEME, default_experiment_log_path, default_experiment_log
 export make_entry_id, entry_from_invent, format_entry_markdown
 export append_experiment_entry!, invent_append_log!, list_experiment_entry_ids
 export narrative_required, package_root, NARRATIVE_PLACEHOLDER
+export robustness_cells, scheme_slug, evaluate_robustness_cell, run_robustness_matrix
+export assess_publication_grade, cell_ok, order_preserved, append_robustness_log_entry!
 
 export write_vtu_high_order, vtk_lagrange_line_nodes, vtk_lagrange_quad_nodes
 export vtk_point_counts_1d, vtk_point_counts_2d

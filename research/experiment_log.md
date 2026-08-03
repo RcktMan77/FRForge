@@ -107,4 +107,15 @@ Optional machine-readable index: [`experiment_log.yaml`](experiment_log.yaml).
 1. Run `frforge invent --method <name> --baseline persson_av` (default scheme only for score history).
 2. Invent **auto-appends** a stub entry (see `FRForge.append_experiment_entry!`).
 3. If `candidate_status` is `promising` or higher, **edit the entry** to complete `hypothesis` and `lessons` before shortlisting.
-4. After Phase 2.3: run robustness matrix (full/nightly) and append a robustness batch entry before `publication_grade`.
+4. After invent: if `promising` or higher, run `frforge robustness --method <name> --matrix full` (local/nightly) and fill hypothesis/lessons before `publication_grade`.
+5. Required CI may run `matrix=ci` light cells only — not the full 8-cell product.
+
+## Promotion rule (P2.3)
+
+A method may be marked **`publication_grade`** only if **all** hold:
+
+1. Default scheme (GL + Rusanov + SSP-RK3): still `promising` / `accepted_candidate` vs baseline.
+2. HLLC cells: no divergence; order preserved; cell status OK.
+3. GLL cells: no catastrophic failure.
+4. `hypothesis` and `lessons` filled (not placeholders).
+5. Robustness summary logged with all cell statuses (`results/robustness/<method>/summary.json`).
