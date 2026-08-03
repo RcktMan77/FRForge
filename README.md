@@ -37,7 +37,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **3 — 1D Euler + smooth order tests** |
 | **Completed** | **4 — Pluggable shock-capturing interface** |
 | **Completed** | **5 — Quantitative test suite & reporting** |
-| **Next** | **6 — Invention-oriented research loop** |
+| **Completed** | **6 — Invention-oriented research loop** |
+| **Next** | **7 — High-order VTK writer** |
 
 ### Milestone roadmap
 
@@ -104,9 +105,13 @@ Works on macOS and Linux with the same commands.
 # Milestone 5: quantitative suite (order + Sod + Shu–Osher) with scored JSON
 ./bin/frforge test --suite quant --method persson_av --report results/m5/report.json
 
+# Milestone 6: invent / score a method vs Persson baseline
+./bin/frforge invent --method scaled_persson --baseline persson_av --report-dir results/invent
+./bin/frforge score --method-report results/invent/method_scaled_persson.json \
+  --baseline-report results/invent/baseline_persson_av.json
+
 # Single runs
 ./bin/frforge run --case sod --p 2 --ne 64 --method persson_av
-./bin/frforge run --case shu_osher --p 1 --ne 100 --method persson_av --t-final 1.8
 
 # Help
 ./bin/frforge --help
@@ -114,10 +119,33 @@ Works on macOS and Linux with the same commands.
 
 | Command | Purpose | Available |
 |---------|---------|-----------|
-| `frforge test [--report PATH] [--suite smoke\|…\|quant\|full] [--method …]` | Verification → scored JSON | M0+ |
-| `frforge run --case sod\|shu_osher\|… [--method null\|persson_av]` | Single run | M1–M5 |
-| `frforge invent ...` | Method vs baseline | M6 |
-| `frforge score ...` | Score two reports | M6 |
+| `frforge test [--report PATH] [--suite …] [--method …]` | Verification → scored JSON | M0+ |
+| `frforge run --case … [--method …]` | Single run | M1+ |
+| `frforge invent --method M --baseline persson_av` | Quant suite + `candidate_status` | M6 |
+| `frforge score --method-report a.json --baseline-report b.json` | Classify two reports | M6 |
+
+---
+
+## How to add a new method
+
+1. **Create** `src/methods/MyMethod.jl` implementing `AbstractCapturingMethod` (override only the hooks you need: `preprocess_state!`, `extrapolate_interface!`, `numerical_flux_method`, `sense!`, `apply_dissipation!`, `post_step!`).
+2. **Include + register** in `src/methods/Registry.jl`:
+   ```julia
+   include("MyMethod.jl")
+   register_method!("my_method", (; kwargs...) -> MyMethod(; kwargs...))
+   ```
+3. **Run** the invent loop:
+   ```bash
+   ./bin/frforge invent --method my_method --baseline persson_av --report-dir results/invent
+   ```
+4. **Read** `candidate_status` in the printed summary / JSON:
+   - `rejected` — hard gates failed  
+   - `pass_gates` — valid but not better than baseline by δ (default 0.02) or trade-off failed  
+   - `promising` — better composite + order-vs-dissipation trade-off  
+   - `accepted_candidate` — promising **and** high-order VTK produced (M7+)  
+5. Structural novelty (new sensors/operators/hybrids) is the primary research goal; coefficient-only search is allowed but secondary.
+
+See also `docs/design.md` § Agent invention pathway.
 
 Reports land under `results/` by convention (gitignored). Schema is versioned (`schema_version: 1`); see design doc for field tables and scoring weights.
 
