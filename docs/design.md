@@ -1215,6 +1215,21 @@ Do **not** rely solely on external tabulated data.
 
 **API:** `append_experiment_entry!`, `invent_append_log!`, `entry_from_invent`, `frforge log list|append`.
 
+### Configurable base schemes (Phase 2.2+)
+
+`SchemeConfig(points, flux, time)` with **`DEFAULT_SCHEME = SchemeConfig(:gl, :rusanov, :ssp_rk3)`** frozen for invent scoring.
+
+| Axis | Default (invent / required CI) | Additional | Notes |
+|------|--------------------------------|------------|--------|
+| Solution points | `:gl` | `:gll` | `build_operators(p; points=…)` |
+| Numerical flux | `:rusanov` | `:hllc` | HLLC for Euler; scalar laws fall back to equation default |
+| Time integrator | `:ssp_rk3` | `:ssp_rk2` | SSP family; see `time_cfl_guidance` |
+
+- State carries `scheme`; residual uses `scheme.flux`; `integrate!` dispatches on `scheme.time`.
+- JSON reports include additive `"scheme"` object (`scheme_dict`).
+- CLI: `--points`, `--flux`, `--time` on `test` / `run`.
+- **CI tier:** defaults only in required CI; non-default axes in full/nightly or targeted unit tests (this package).
+
 ---
 
 ### Git branching strategy

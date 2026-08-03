@@ -11,17 +11,32 @@ mutable struct SolutionState2D{T,Neq}
     p::Int
     mesh::Mesh2D{T}
     ops::FROperators{T}
+    scheme::SchemeConfig
 end
 
-function allocate_state(mesh::Mesh2D{T}, ops::FROperators{T}, ::Val{Neq}) where {T,Neq}
+function allocate_state(
+    mesh::Mesh2D{T},
+    ops::FROperators{T},
+    ::Val{Neq};
+    scheme::Union{Nothing,SchemeConfig}=nothing,
+) where {T,Neq}
     Np = n_points(ops)
     Nel = mesh.n_elements
     u = zeros(T, Np, Np, Nel, Neq)
-    return SolutionState2D{T,Neq}(u, zero(T), ops.p, mesh, ops)
+    sch = something(
+        scheme,
+        SchemeConfig(; points=ops.points, flux=DEFAULT_SCHEME.flux, time=DEFAULT_SCHEME.time),
+    )
+    return SolutionState2D{T,Neq}(u, zero(T), ops.p, mesh, ops, sch)
 end
 
-function allocate_state(mesh::Mesh2D{T}, ops::FROperators{T}, neq::Int) where {T}
-    return allocate_state(mesh, ops, Val(neq))
+function allocate_state(
+    mesh::Mesh2D{T},
+    ops::FROperators{T},
+    neq::Int;
+    scheme::Union{Nothing,SchemeConfig}=nothing,
+) where {T}
+    return allocate_state(mesh, ops, Val(neq); scheme=scheme)
 end
 
 """

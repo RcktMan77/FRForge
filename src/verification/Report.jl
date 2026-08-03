@@ -67,6 +67,7 @@ function report_skeleton(;
     hard_gate_failures = String[],
     cases = Any[],
     fill_scores::Bool = true,
+    scheme = DEFAULT_SCHEME,
 )
     n_cases = length(cases)
     n_passed = count(c -> get(c, "pass", false) === true, cases)
@@ -76,6 +77,8 @@ function report_skeleton(;
     if fill_scores && n_cases > 0
         scores = score_suite_absolute(cases)
     end
+
+    sch = scheme isa SchemeConfig ? scheme_dict(scheme) : scheme
 
     return Dict{String,Any}(
         "schema_version" => SCHEMA_VERSION,
@@ -88,6 +91,7 @@ function report_skeleton(;
         "suite" => String(suite),
         "method_name" => String(method_name),
         "method_params" => method_params,
+        "scheme" => sch,
         "baseline_name" => baseline_name,
         "overall_pass" => overall_pass,
         "diverged" => diverged,
