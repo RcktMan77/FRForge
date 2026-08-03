@@ -15,8 +15,9 @@ function _print_usage(io=stderr)
     println(io, "  frforge test --suite advection --report results/m1/report.json")
     println(io, "  frforge test --suite burgers --report results/m2/report.json")
     println(io, "  frforge test --suite euler --report results/m3/report.json")
+    println(io, "  frforge test --suite capturing --report results/m4/report.json")
     println(io, "  frforge run --case advection_sine --p 3 --ne 16")
-    println(io, "  frforge run --case burgers_square --p 3 --ne 32")
+    println(io, "  frforge run --case burgers_square --p 3 --ne 32 --method persson_av")
     println(io, "  frforge run --case euler_density_wave --p 3 --ne 16")
 end
 
@@ -31,10 +32,10 @@ function _parse_test_args(args)
         default = "results/report.json"
         dest_name = "report"
         "--suite"
-        help = "Suite name: smoke | advection | m1 | burgers | m2 | euler | m3 | full"
+        help = "Suite name: smoke | advection | burgers | euler | capturing | m4 | full"
         default = "advection"
         "--method"
-        help = "Capturing method name (null until M4)"
+        help = "Capturing method name: null | persson_av"
         default = "null"
     end
     return parse_args(args, s)
@@ -70,6 +71,9 @@ function _parse_run_args(args)
         help = "Advection speed"
         arg_type = Float64
         default = 1.0
+        "--method"
+        help = "Capturing method: null | persson_av"
+        default = "null"
     end
     return parse_args(args, s)
 end
@@ -108,18 +112,31 @@ function cli_test(opts::AbstractDict)
         cases, overall_pass, hard_fails = run_m3_euler_suite()
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+    elseif suite in ("capturing", "m4")
+        cases, overall_pass, hard_fails = run_m4_capturing_suite()
+        diverged = any(c -> get(c, "diverged", false) === true, cases)
+        nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+        method = "persson_av"
     elseif suite == "full"
         c1, p1, f1 = run_m1_advection_suite()
         c2, p2, f2 = run_m2_burgers_suite()
         c3, p3, f3 = run_m3_euler_suite()
-        cases = vcat(c1, c2, c3)
-        hard_fails = vcat(f1, f2, f3)
-        overall_pass = p1 && p2 && p3
+        c4, p4, f4 = run_m4_capturing_suite()
+        cases = vcat(c1, c2, c3, c4)
+        hard_fails = vcat(f1, f2, f3, f4)
+        overall_pass = p1 && p2 && p3 && p4
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     else
-        println(stderr, "Unknown suite: $suite (use smoke|advection|m1|burgers|m2|euler|m3|full)")
+        println(stderr, "Unknown suite: $suite (use smoke|advection|burgers|euler|capturing|full)")
         return 2
+    end
+
+    mparams = Dict{String,Any}()
+    try
+        mparams = method_params(get_capturing_method(method))
+    catch
+        mparams = Dict{String,Any}("method" => method)
     end
 
     report = write_report_skeleton(
@@ -127,7 +144,7 @@ function cli_test(opts::AbstractDict)
         command="test",
         suite=suite,
         method_name=method,
-        method_params=Dict{String,Any}(),
+        method_params=mparams,
         baseline_name=nothing,
         overall_pass=overall_pass,
         diverged=diverged,
@@ -180,6 +197,7 @@ function cli_run(args)
     Ne = opts["ne"]
     t_final = opts["t_final"]
     cfl = opts["cfl"]
+    method = get_capturing_method(opts["method"])
 
     if case == "advection_sine"
         a = opts["a"]
@@ -189,10 +207,10 @@ function cli_run(args)
         state = allocate_state(mesh, ops, Val(1))
         set_initial_condition!(state, x -> sin(2π * x))
         M0 = discrete_mass(state, 1)
-        result = ssp_rk3!(state, eq, NullCapturing(), t_final; cfl=cfl)
+        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
         MT = discrete_mass(state, 1)
         err = l2_error(state, x -> sin(2π * (x - a * t_final)), 1)
-        println("case=advection_sine p=$p ne=$Ne a=$a t_final=$t_final cfl=$cfl")
+        println("case=advection_sine p=$p ne=$Ne a=$a t_final=$t_final cfl=$cfl method=$(opts["method"])")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_error=$err mass_change=$(MT - M0)")
         return result.status == :ok ? 0 : 1
@@ -204,14 +222,16 @@ function cli_run(args)
         set_initial_condition!(state, x -> burgers_square_ic(x))
         u0_min, u0_max = solution_extrema(state, 1)
         M0 = discrete_mass(state, 1)
-        result = ssp_rk3!(state, eq, NullCapturing(), t_final; cfl=cfl)
+        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
         MT = discrete_mass(state, 1)
         u_min, u_max = solution_extrema(state, 1)
         _, _, η = overshoot_metric(u_min, u_max, u0_min, u0_max)
-        println("case=burgers_square p=$p ne=$Ne t_final=$t_final cfl=$cfl")
+        println("case=burgers_square p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"])")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("mass_change=$(MT - M0) u_range=[$u_min, $u_max] overshoot=$η")
-        println("note: pure high-order FR is expected to oscillate near the discontinuity")
+        if opts["method"] == "null"
+            println("note: pure high-order FR is expected to oscillate near the discontinuity")
+        end
         return result.status == :ok ? 0 : 1
     elseif case == "euler_density_wave"
         eq = Euler1D(1.4)
@@ -220,10 +240,10 @@ function cli_run(args)
         state = allocate_state(mesh, ops, Val(3))
         set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
         M0 = discrete_mass(state, 1)
-        result = ssp_rk3!(state, eq, NullCapturing(), t_final; cfl=cfl)
+        result = ssp_rk3!(state, eq, method, t_final; cfl=cfl)
         MT = discrete_mass(state, 1)
         err = l2_error(state, x -> euler_density_wave_conserved(eq, x, t_final), 1)
-        println("case=euler_density_wave p=$p ne=$Ne t_final=$t_final cfl=$cfl")
+        println("case=euler_density_wave p=$p ne=$Ne t_final=$t_final cfl=$cfl method=$(opts["method"])")
         println("status=$(result.status) n_steps=$(result.n_steps) t=$(result.t)")
         println("L2_density=$err mass_change=$(MT - M0) positivity=$(positivity_ok(eq, state))")
         return result.status == :ok ? 0 : 1
