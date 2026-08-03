@@ -34,7 +34,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **0 — Repository setup, project skeleton & verification harness** |
 | **Completed** | **1 — 1D FR linear advection** |
 | **Completed** | **2 — 1D inviscid Burgers** |
-| **Next** | **3 — 1D Euler + smooth order tests** |
+| **Completed** | **3 — 1D Euler + smooth order tests** |
+| **Next** | **4 — Pluggable shock-capturing interface** |
 
 ### Milestone roadmap
 
@@ -92,9 +93,13 @@ Works on macOS and Linux with the same commands.
 # Milestone 2: Burgers conservation + HO oscillation demo
 ./bin/frforge test --suite burgers --report results/m2/report.json
 
+# Milestone 3: Euler density-wave order + BC freestream tests
+./bin/frforge test --suite euler --report results/m3/report.json
+
 # Single runs
 ./bin/frforge run --case advection_sine --p 3 --ne 16
 ./bin/frforge run --case burgers_square --p 3 --ne 32 --t-final 0.15
+./bin/frforge run --case euler_density_wave --p 3 --ne 16
 
 # Help
 ./bin/frforge --help
@@ -102,8 +107,8 @@ Works on macOS and Linux with the same commands.
 
 | Command | Purpose | Available |
 |---------|---------|-----------|
-| `frforge test [--report PATH] [--suite smoke\|advection\|burgers\|full]` | Verification → JSON | M0+ |
-| `frforge run --case advection_sine \| burgers_square ...` | Single run | M1–M2 |
+| `frforge test [--report PATH] [--suite smoke\|advection\|burgers\|euler\|full]` | Verification → JSON | M0+ |
+| `frforge run --case advection_sine \| burgers_square \| euler_density_wave` | Single run | M1–M3 |
 | `frforge invent ...` | Method vs baseline | M6 |
 | `frforge score ...` | Score two reports | M6 |
 
