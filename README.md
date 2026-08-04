@@ -53,13 +53,12 @@ High-order FR/DG schemes shine in smooth flow and struggle at shocks. FRForge tr
 | **Invent scheme** | Frozen **GL + Rusanov + SSP-RK3** so composites stay comparable |
 | **CI** | Ubuntu · Julia 1.10 / 1.11 · light suites (~10–15 min) |
 
-<!-- Math uses GitHub's $`...`$ form (code-span delimiters) so `_` and `|` are not
-     eaten by Markdown before KaTeX runs. Avoid bare $...$ inside raw HTML. -->
+<!-- Avoid $ math inside raw HTML: GitHub does not run KaTeX reliably there. -->
 <table>
   <tr>
     <td width="25%" align="center" valign="top">
       <strong>FR core</strong><br />
-      <sub>GL/GLL points, $`g_{DG}`$, Rusanov/HLLC, SSP-RK</sub>
+      <sub>GL/GLL points, g<sub>DG</sub>, Rusanov/HLLC, SSP-RK</sub>
     </td>
     <td width="25%" align="center" valign="top">
       <strong>Hooks</strong><br />
@@ -97,7 +96,7 @@ What is still scarce is a **systematic laboratory**: a fixed high-order FR discr
 
 ## Approach
 
-1. **Green-field FR core** — Solution points, $`g_{DG}`$ correction, interface fluxes, and SSP-RK in pure Julia (no external FR library dependency).
+1. **Green-field FR core** — Solution points, g_DG correction, interface fluxes, and SSP-RK in pure Julia (no external FR library dependency).
 2. **Pluggable capturing** — Hooks: `preprocess_state!`, interface extrapolation, optional flux override, `sense!`, `apply_dissipation!`, `post_step!`. New methods are real code under `src/methods/`.
 3. **Quantitative scoring** — Versioned JSON reports; invent classifies candidates against `persson_av`.
 4. **Laboratory loop** — Experiment log, frontier analytics, fine-mesh `confirm`, reproducibility snapshots. Invent scheme stays frozen unless a re-baseline is logged.
@@ -115,11 +114,11 @@ FRForge uses **Flux Reconstruction** on tensor-product elements (1D; 2D quads, o
 | Axis | Default (invent / scoring) | Also available |
 |------|----------------------------|----------------|
 | Solution points | **Gauss–Legendre (GL)** | Gauss–Lobatto–Legendre (GLL) |
-| Correction | Huynh $`g_{DG}`$ (Legendre/Radau) | fixed (not a scheme axis) |
+| Correction | Huynh **g_DG** (Legendre/Radau) | fixed (not a scheme axis) |
 | Interface flux | **Rusanov** (local Lax–Friedrichs) | **HLLC** (Euler) |
 | Time | **SSP-RK3** | SSP-RK2 |
 
-On GL nodes with $`g_{DG}`$, the scheme recovers a DG-equivalent FR formulation (Huynh). GLL / HLLC / SSP-RK2 are for **robustness and exploration**; invent composite history stays on **GL + Rusanov + SSP-RK3**.
+On GL nodes with **g_DG**, the scheme recovers a DG-equivalent FR formulation (Huynh). GLL / HLLC / SSP-RK2 are for **robustness and exploration**; invent composite history stays on **GL + Rusanov + SSP-RK3**.
 
 **References:** Huynh (AIAA 2007-4079); Vincent–Castonguay–Jameson (energy-stable FR); Rusanov; Toro (HLLC); Gottlieb–Shu (SSP-RK).
 
@@ -127,10 +126,10 @@ On GL nodes with $`g_{DG}`$, the scheme recovers a DG-equivalent FR formulation 
 
 Honest invent baseline: classical **Persson-style modal sensor + element-local AV** (`persson_av`)—mild and transparent, not a heavily tuned champion:
 
-- Modal (Legendre) smoothness indicator $`\sigma`$ per element.
-- Element viscosity $`\varepsilon \propto c_{\mathrm{av}}\,\sigma\,(h/p)\,\lambda_{\max}`$ via BR0-style (or local) dissipation (1D/2D).
+- Modal (Legendre) smoothness indicator **σ** per element.
+- Element viscosity **ε ∝ c_av · σ · (h/p) · λ_max** via BR0-style (or local) dissipation (1D/2D).
 
-`scaled_persson` is a composition demo with elevated $`c_{\mathrm{av}}`$. `NullCapturing` is for smooth order and excess-dissipation references.
+`scaled_persson` is a composition demo with elevated **c_av**. `NullCapturing` is for smooth order and excess-dissipation references.
 
 **Reference:** Persson & Peraire, AIAA 2006-112.
 
@@ -157,7 +156,7 @@ Honest invent baseline: classical **Persson-style modal sensor + element-local A
 | **Sod** shock tube | Shock, contact, rarefaction; overshoot; thickness; positivity |
 | **Shu–Osher** | Shock–entropy waves—classic excess-dissipation test |
 
-Shu–Osher is **most stable at lower $`p`$** with the present AV + explicit SSP-RK (the quant suite uses $`p = 1`$ as the robust start); higher $`p`$ Shu–Osher is a stress test, not a routine CI gate.
+Shu–Osher is **most stable at lower polynomial degree** with the present AV + explicit SSP-RK (the quant suite uses **p = 1** as the robust start); at higher degree it is a stress test, not a routine CI gate.
 
 ### 2D discontinuous
 
@@ -173,10 +172,10 @@ Shu–Osher is **most stable at lower $`p`$** with the present AV + explicit SSP
   <img src="docs/images/riemann_cfg6_pressure.png" alt="2D Riemann cfg6 pressure" width="48%" />
 </p>
 <p align="center">
-  <sub><strong>Left:</strong> numerical Schlieren $`|\nabla\rho|`$ (white→black). &nbsp; <strong>Right:</strong> pressure.</sub>
+  <sub><strong>Left:</strong> numerical Schlieren (density-gradient magnitude, white→black). &nbsp; <strong>Right:</strong> pressure.</sub>
 </p>
 <p align="center">
-  <em>Figure: 2D Riemann problem (Lax–Liu configuration 6), documentation baseline with <code>persson_av</code> (presentation mesh $`192\times 192`$, $`p=2`$, $`t=0.15`$); not invent/CI-light resolution. High-order VTU + ParaView tessellate/resample — see <a href="docs/visualization.md">docs/visualization.md</a>.</em>
+  <em>Figure: 2D Riemann problem (Lax–Liu configuration 6), documentation baseline with <code>persson_av</code> (presentation mesh 192×192, p = 2, t = 0.15); not invent/CI-light resolution. High-order VTU + ParaView tessellate/resample — see <a href="docs/visualization.md">docs/visualization.md</a>.</em>
 </p>
 
 <p align="center">
@@ -186,17 +185,17 @@ Shu–Osher is **most stable at lower $`p`$** with the present AV + explicit SSP
   <img src="docs/images/double_mach_pressure.png" alt="Double Mach pressure" width="90%" />
 </p>
 <p align="center">
-  <sub><strong>Top:</strong> numerical Schlieren $`|\nabla\rho|`$ (white→black). &nbsp; <strong>Bottom:</strong> pressure.</sub>
+  <sub><strong>Top:</strong> numerical Schlieren (density-gradient magnitude, white→black). &nbsp; <strong>Bottom:</strong> pressure.</sub>
 </p>
 <p align="center">
-  <em>Figure: Reduced Double-Mach-like configuration (inclined shock + reflecting wall), documentation baseline with <code>persson_av</code> (presentation mesh $`280\times 100`$, $`p=1`$, $`t=0.08`$). Same pipeline as the Riemann figures; optional/full CI tier for the short reduced case — see <a href="docs/visualization.md">docs/visualization.md</a>.</em>
+  <em>Figure: Reduced Double-Mach-like configuration (inclined shock + reflecting wall), documentation baseline with <code>persson_av</code> (presentation mesh 280×100, p = 1, t = 0.08). Same pipeline as the Riemann figures; optional/full CI tier for the short reduced case — see <a href="docs/visualization.md">docs/visualization.md</a>.</em>
 </p>
 
 ### Supporting checks
 
 | Check | Role |
 |-------|------|
-| Positivity of $`\rho`$ and $`p`$ | Hard gate on Euler discontinuous runs |
+| Positivity of density and pressure | Hard gate on Euler discontinuous runs |
 | Freestream preservation | Cartesian and **curved** quads |
 | BC freestream | Transmissive / Dirichlet paths |
 | Robustness matrix | Scheme axes beyond invent defaults |
@@ -224,8 +223,8 @@ Relative maps vs baseline and an **order-vs-dissipation trade-off** apply on inv
 | Status | Meaning |
 |--------|---------|
 | `rejected` | Hard gates failed |
-| `pass_gates` | Valid, but composite margin below $`\delta`$ (default $`0.02`$) or trade-off failed |
-| `promising` | Composite beats baseline by at least $`\delta`$ and trade-off OK |
+| `pass_gates` | Valid, but composite margin below δ (default 0.02) or trade-off failed |
+| `promising` | Composite beats baseline by at least δ and trade-off OK |
 | `accepted_candidate` | `promising` **and** HO VTK produced |
 
 Publication-grade narrative also wants **hypothesis/lessons**, robustness evidence, and **fine-mesh confirm**—not only a green coarse invent JSON.
