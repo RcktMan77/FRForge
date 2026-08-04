@@ -1230,6 +1230,21 @@ Do **not** rely solely on external tabulated data.
 - CLI: `--points`, `--flux`, `--time` on `test` / `run`.
 - **CI tier:** defaults only in required CI; non-default axes in full/nightly or targeted unit tests (this package).
 
+### Curved elements (Phase 3.2+)
+
+Isoparametric quads via optional `mesh.geom_x/y/ξ`. Metrics (`MeshMetrics2D`) at solution points:
+
+- ``J = x_\\xi y_\\eta - x_\\eta y_\\xi``
+- Contravariant fluxes ``\\tilde F = y_\\eta F - x_\\eta G``, ``\\tilde G = -y_\\xi F + x_\\xi G``
+- Face ``s_J`` and unit normals from metric cofactors; residual uses metric form with FR corrections
+
+**Merge gate:** free-stream preservation (`run_freestream_preservation_2d`):
+- Cartesian/affine: residual ~ machine precision
+- Wavy curved: analytic metrics (`build_mesh_metrics_analytic_wavy`) with residual converging under ``h,p`` (CI-light: ``p=3``, ``n=4``)
+
+CI suite: `frforge test --suite curved` / `run_p32_curved_suite`.  
+AV length scale uses `metrics.h_char`. VTK uses `physical_xy` (curved-aware).
+
 ### 2D capturing (Phase 3.1+)
 
 Tensor-product Cartesian FR residual runs the same staged hooks as 1D:

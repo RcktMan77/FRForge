@@ -27,6 +27,7 @@ include("fr/Operators.jl")
 include("mesh/BoundaryConditions.jl")
 include("mesh/Mesh1D.jl")
 include("mesh/Mesh2D.jl")
+include("mesh/MeshMetrics2D.jl")
 include("solvestate/SolutionState.jl")
 include("solvestate/SolutionState2D.jl")
 
@@ -94,6 +95,8 @@ export g_DG_endpoints, g_DG_values_and_derivs, legendre_P
 export AbstractBC, PeriodicBC, TransmissiveBC, DirichletBC
 export Mesh1D, physical_coords
 export Mesh2D, element_index, element_coords, physical_xy, physical_coords_2d
+export MeshMetrics2D, build_mesh_metrics, build_mesh_metrics_analytic_wavy
+export apply_geometry_warp!, make_wavy_mesh2d, is_curved_mesh, wavy_physical, wavy_partials
 
 export SolutionState, SolutionState2D, allocate_state, set_initial_condition!
 export discrete_mass, l2_error
@@ -135,6 +138,8 @@ export observed_orders, order_pass, solution_extrema, overshoot_metric
 
 export run_advection2d_smooth_order, run_euler2d_smooth_order, run_euler2d_discontinuous
 export run_m8_2d_suite, run_p31_2d_capturing_suite
+export run_freestream_preservation_2d, run_advection2d_curved_order
+export run_euler2d_curved_discontinuous, run_p32_curved_suite
 
 export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report
