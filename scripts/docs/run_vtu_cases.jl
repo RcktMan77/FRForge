@@ -122,4 +122,7 @@ function main(args=ARGS)
     return 0
 end
 
-abspath(PROGRAM_FILE) == @__FILE__ && (main(); nothing)
+# Parenthesize @__FILE__ so it is not parsed as a macro spanning `&&`.
+if abspath(PROGRAM_FILE) == abspath(@__FILE__)
+    main()
+end
