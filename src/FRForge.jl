@@ -14,6 +14,7 @@ using LinearAlgebra
 using ArgParse
 using Dates
 using JSON
+using SHA
 
 # --- Scheme config (points / flux / time axes) ---
 include("scheme/SchemeConfig.jl")
@@ -74,6 +75,7 @@ include("invent/ExperimentLog.jl")
 include("invent/LogAnalytics.jl")
 include("invent/Invent.jl")
 include("invent/Robustness.jl")
+include("invent/Snapshot.jl")
 
 # --- I/O ---
 include("io/VTKHighOrder.jl")
@@ -160,6 +162,8 @@ export log_summary, log_frontier, log_pareto, log_lessons
 export format_log_summary_text, format_log_frontier_text, format_log_pareto_text
 export format_log_lessons_text, format_log_entry_text
 export NEAR_MISS_COMPOSITE_MARGIN
+export METHOD_SOURCE_MAP, resolve_method_sources, freeze_snapshot, verify_snapshot, snapshot_tables
+export SNAPSHOT_SCHEMA_VERSION
 export robustness_cells, scheme_slug, evaluate_robustness_cell, run_robustness_matrix
 export assess_publication_grade, cell_ok, order_preserved, append_robustness_log_entry!
 

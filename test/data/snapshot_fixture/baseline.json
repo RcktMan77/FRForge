@@ -1,0 +1,225 @@
+{
+  "baseline_name": null,
+  "cases": [
+    {
+      "capturing_method": "null",
+      "case_type": "smooth_order",
+      "conservation_metric": "periodic_mass_change",
+      "conservation_pass": true,
+      "conservation_residual": 4.570788192381768e-13,
+      "diverged": false,
+      "equation": "euler1d",
+      "formal_order": 3,
+      "l2_errors": [
+        6.319003037353025e-5,
+        8.496378758807548e-6,
+        1.0838434244025756e-6
+      ],
+      "mesh_sizes": [
+        0.0625,
+        0.03125,
+        0.015625
+      ],
+      "metrics": {
+        "cfl": 0.1,
+        "conservation_residual_components": [
+          4.4653170050423786e-13,
+          4.570788192381768e-13,
+          4.43349061166979e-13
+        ],
+        "dt_fixed": 4.1666666666666665e-5,
+        "mass_abs_change_components": [
+          4.4653170050423796e-13,
+          4.570788192381769e-13,
+          1.3300471835009375e-12
+        ],
+        "n_elements_list": [
+          16,
+          32,
+          64
+        ],
+        "t_final": 1.0,
+        "γ": 1.4
+      },
+      "name": "euler_smooth_order_p2",
+      "nan_detected": false,
+      "observed_orders": [
+        2.8947769728925437,
+        2.970691726005145
+      ],
+      "order_pass": true,
+      "order_tolerance": 0.3,
+      "p": 2,
+      "pass": true,
+      "positivity_ok": true,
+      "wall_time_sec": 4.22710394859314
+    },
+    {
+      "capturing_method": "null",
+      "case_type": "smooth_order",
+      "conservation_metric": "periodic_mass_change",
+      "conservation_pass": true,
+      "conservation_residual": 2.863265180508278e-13,
+      "diverged": false,
+      "equation": "euler1d",
+      "formal_order": 4,
+      "l2_errors": [
+        6.914202736301939e-6,
+        3.731417486611999e-7,
+        2.1945873235297692e-8
+      ],
+      "mesh_sizes": [
+        0.125,
+        0.0625,
+        0.03125
+      ],
+      "metrics": {
+        "cfl": 0.1,
+        "conservation_residual_components": [
+          2.863265180508278e-13,
+          2.683409050519003e-13,
+          2.74743191160572e-13
+        ],
+        "dt_fixed": 4.464285714285714e-5,
+        "mass_abs_change_components": [
+          2.8632651805082787e-13,
+          2.6834090505190034e-13,
+          8.242295734817162e-13
+        ],
+        "n_elements_list": [
+          8,
+          16,
+          32
+        ],
+        "t_final": 1.0,
+        "γ": 1.4
+      },
+      "name": "euler_smooth_order_p3",
+      "nan_detected": false,
+      "observed_orders": [
+        4.211767217457794,
+        4.087702202067292
+      ],
+      "order_pass": true,
+      "order_tolerance": 0.3,
+      "p": 3,
+      "pass": true,
+      "positivity_ok": true,
+      "wall_time_sec": 1.644744873046875
+    },
+    {
+      "capturing_method": "persson_av",
+      "case_type": "discontinuous",
+      "conservation_metric": "none",
+      "conservation_pass": true,
+      "conservation_residual": 6.2204685846722896e-12,
+      "diverged": false,
+      "equation": "euler1d",
+      "excess_dissipation": 0.0002172622164505941,
+      "l1_error_vs_reference": 0.005455380175622511,
+      "method_params": {
+        "av_form": "conservative_br0",
+        "c_av": 0.1,
+        "method": "persson_av",
+        "s0_factor": -4.0,
+        "κ": 4.0
+      },
+      "metrics": {
+        "excess_dissipation_vs_exact": 0.0025946721865086884,
+        "excess_dissipation_vs_null": 0.0002172622164505941,
+        "l1_density_vs_exact": 0.005455380175622511,
+        "mass_change": 6.2204685846722896e-12,
+        "n_steps": 950,
+        "u_max": 1.0080719360524972,
+        "u_min": 0.10836329032248597
+      },
+      "n_elements": 64,
+      "name": "sod_p2_ne64_persson_av",
+      "nan_detected": false,
+      "overshoot": 0.019013382488587464,
+      "p": 2,
+      "pass": true,
+      "positivity_ok": true,
+      "shock_thickness": 2.319857302938907,
+      "shock_thickness_unit": "sp_spacings",
+      "t_final": 0.2,
+      "wall_time_sec": 0.22310400009155273
+    },
+    {
+      "capturing_method": "persson_av",
+      "case_type": "discontinuous",
+      "conservation_metric": "none",
+      "conservation_pass": true,
+      "conservation_residual": 18.586708421339356,
+      "diverged": false,
+      "equation": "euler1d",
+      "excess_dissipation": 0.01752525571538908,
+      "l1_error_vs_reference": 0.026023926955650062,
+      "method_params": {
+        "av_form": "conservative_br0",
+        "c_av": 0.3,
+        "method": "persson_av",
+        "s0_factor": -4.0,
+        "κ": 4.0
+      },
+      "metrics": {
+        "mass_change": 18.586708421339356,
+        "n_steps": 2564,
+        "reference_file": "test/data/shu_osher_ref.csv",
+        "u_max": 4.1608837189051355,
+        "u_min": 0.8001728916742125
+      },
+      "n_elements": 100,
+      "name": "shu_osher_p1_ne100_persson_av",
+      "nan_detected": false,
+      "overshoot": 0.0,
+      "p": 1,
+      "pass": true,
+      "positivity_ok": true,
+      "shock_thickness": 5.1506964403272555,
+      "shock_thickness_unit": "sp_spacings",
+      "t_final": 1.8,
+      "wall_time_sec": 0.8267300128936768
+    }
+  ],
+  "command": "invent",
+  "diverged": false,
+  "git_commit": "1173cdb",
+  "hard_gate_failures": [],
+  "julia_version": "1.11.7",
+  "method_name": "persson_av",
+  "method_params": {
+    "av_form": "conservative_br0",
+    "c_av": 0.1,
+    "method": "persson_av",
+    "s0_factor": -4.0,
+    "κ": 4.0
+  },
+  "nan_detected": false,
+  "overall_pass": true,
+  "package": "FRForge",
+  "package_version": "0.1.0",
+  "schema_version": 1,
+  "scoring_formula_version": 1,
+  "scoring_weights": {
+    "dissipation": 0.25,
+    "order_preservation": 0.3,
+    "robustness": 0.2,
+    "shock_quality": 0.25
+  },
+  "suite": "quant",
+  "summary": {
+    "n_cases": 4,
+    "n_failed": 0,
+    "n_passed": 4,
+    "scores": {
+      "composite": 0.918663861117966,
+      "dissipation": 0.9556437051704008,
+      "order_preservation": 1.0,
+      "robustness": 1.0,
+      "shock_quality": 0.7190117393014638
+    }
+  },
+  "timestamp_utc": "2026-08-03T19:39:01Z",
+  "wall_time_sec": 8.611005067825317
+}

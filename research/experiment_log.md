@@ -19,6 +19,10 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 
 **Phase 4:** Residual buffer reuse + in-place fluxes; invent scheme still GL+Rusanov+SSP-RK3. Outputs stable to FP noise.
 
+**Phase 5.1:** Experiment-log analytics — `frforge log summary|frontier|lessons|show` (read-only).
+
+**Phase 5.2:** Reproducibility snapshots — `frforge snapshot freeze|verify|tables` (freeze after short-list only).
+
 ---
 
 ## Schema
