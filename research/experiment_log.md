@@ -17,6 +17,8 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 
 **Phase 3.3b:** Optional reduced DMR/FFS (full/nightly): reflecting/Ghost BCs + solid mask. Suite: `frforge test --suite optional2d`.
 
+**Phase 4:** Residual buffer reuse + in-place fluxes; invent scheme still GL+Rusanov+SSP-RK3. Outputs stable to FP noise.
+
 ---
 
 ## Schema

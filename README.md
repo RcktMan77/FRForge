@@ -39,7 +39,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **P3.2** Curved elements |
 | **Completed** | **P3.3a** 2D Riemann + isentropic vortex |
 | **Completed** | **P3.3b** Optional reduced DMR/FFS |
-| Next | **P4** Performance & scale |
+| **Completed** | **P4** Performance (alloc reduction, numeric fidelity) |
+| Next | Further invent methods / higher-res benchmarks |
 
 ### Milestone roadmap (M0–M8 complete)
 

@@ -1279,6 +1279,10 @@ CLI: `frforge test --suite benchmarks` / `p33a` → `run_p33a_benchmark_suite`.
 
 2D residual supports `Periodic` / `Transmissive` / `Reflecting` / `Dirichlet` / `GhostState` BCs and optional solid-element masks.
 
+### Performance (Phase 4)
+
+Profile → allocation reduction first; optional threading later. 2D residual reuses face/flux work buffers and in-place Rusanov/physical fluxes within each residual evaluation. Arithmetic order is unchanged (no default threading) so outputs match pre-P4 to floating-point noise. Clarity and invent scheme defaults remain frozen.
+
 ### Robustness matrix (Phase 2.3+)
 
 Re-evaluate short-listed methods across scheme axes before any publication-grade claim.

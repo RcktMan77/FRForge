@@ -178,6 +178,19 @@ function interface_flux_n(eq::AbstractEquation, uL, uR, nx, ny, flux_kind::Symbo
     end
 end
 
+"""In-place normal-interface flux (Rusanov path; HLLC falls back to allocating)."""
+function interface_flux_n!(out::AbstractVector, eq::AbstractEquation, uL, uR, nx, ny, flux_kind::Symbol)
+    if flux_kind === :rusanov
+        return numerical_flux_n!(out, eq, uL, uR, nx, ny)
+    else
+        fh = interface_flux_n(eq, uL, uR, nx, ny, flux_kind)
+        @inbounds for c in 1:length(out)
+            out[c] = fh[c]
+        end
+        return out
+    end
+end
+
 function _hllc_or_fallback_n(eq::Euler2D, uL, uR, nx, ny)
     return hllc_flux_n(eq, uL, uR, nx, ny)
 end

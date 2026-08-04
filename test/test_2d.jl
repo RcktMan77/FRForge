@@ -313,3 +313,26 @@ end
     @test isempty(fails)
     @test length(cases) >= 2
 end
+
+@testset "P4 residual numeric fidelity (FP noise)" begin
+    # Freestream residual still ~ machine zero after buffer-reuse residual
+    eq = Euler2D(1.4)
+    ops = build_operators(2)
+    mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, 4, 4)
+    state = allocate_state(mesh, ops, Val(4))
+    U0 = primitives_to_conserved(eq, 1.0, 0.5, 0.25, 1.0)
+    set_initial_condition!(state, (x, y) -> U0)
+    du = similar(state.u)
+    residual!(du, state, eq, NullCapturing())
+    @test maximum(abs, du) < 1e-12
+    # Deterministic: two residual calls match exactly
+    du2 = similar(state.u)
+    residual!(du2, state, eq, NullCapturing())
+    @test du == du2
+    # Vortex L2 within FP noise of pre-P4 reference (same n_list so fixed-Δt matches)
+    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
+    @test !c["diverged"]
+    @test isapprox(c["l2_errors"][1], 0.02069688015968434; rtol=1e-12, atol=1e-14)
+    @test isapprox(c["l2_errors"][2], 0.0031146731348864697; rtol=1e-12, atol=1e-14)
+    @test isapprox(c["observed_orders"][1], 2.7322606381318906; rtol=1e-10, atol=1e-12)
+end
