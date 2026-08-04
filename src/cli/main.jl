@@ -33,6 +33,8 @@ function main_cli(args = ARGS)
             return cli_snapshot(rest)
         elseif cmd == "robustness"
             return cli_robustness(rest)
+        elseif cmd == "tune"
+            return cli_tune(rest)
         else
             println(stderr, "Unknown command: $cmd")
             println(stderr, "  Valid commands: $(join(CLI_COMMANDS, ", "))")

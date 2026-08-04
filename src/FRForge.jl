@@ -48,6 +48,7 @@ include("flux/HLLC.jl")
 
 # --- Capturing hooks + Persson AV baseline (1D + 2D) ---
 include("capturing/Interfaces.jl")
+include("capturing/SharedAV.jl")
 include("capturing/PerssonAV.jl")
 include("capturing/PerssonAV2D.jl")
 
@@ -78,6 +79,7 @@ include("invent/Candidate.jl")
 include("invent/ExperimentLog.jl")
 include("invent/LogAnalytics.jl")
 include("invent/Invent.jl")
+include("invent/Tune.jl")
 include("invent/Robustness.jl")
 include("invent/Snapshot.jl")
 
@@ -194,6 +196,7 @@ export make_ffs_solid_mask, run_forward_facing_step
 export invent_method, score_reports, run_method_report
 export classify_candidate, print_candidate_summary, score_suite_relative
 export tradeoff_ok, DEFAULT_SCORE_MARGIN
+export tune_coefficient
 export FROZEN_INVENT_SCHEME, default_experiment_log_path, default_experiment_log_yaml_path
 export make_entry_id, entry_from_invent, format_entry_markdown
 export append_experiment_entry!, invent_append_log!, list_experiment_entry_ids

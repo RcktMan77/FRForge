@@ -122,16 +122,14 @@ function sense!(σ::AbstractVector{T}, sensor::PerssonSensor{T}, u_work, state, 
 
     V = ops.V_legendre
     # Modal coeffs û = V \\ u  (same algorithm; V cached on operators)
-    s0 = sensor.s0_factor * log10(T(max(p, 1)))
+    s0 = persson_s0(p, sensor.s0_factor)
 
     @inbounds for e in 1:Nel
         u_e = collect(sensor_field(eq, u_work, e))
         û = V \ u_e
         e_high = û[Np]^2
         e_tot = sum(abs2, û) + sensor.ε_floor
-        s_e = log10(e_high / e_tot + sensor.ε_floor)
-        # Smooth indicator
-        σ[e] = one(T) / (one(T) + exp(-sensor.κ * (s_e - s0)))
+        σ[e] = persson_sigma(e_high, e_tot, s0, sensor.κ, sensor.ε_floor)
     end
     return σ
 end
@@ -307,15 +305,8 @@ function apply_dissipation_br0!(
         up = uL[e_right, c]
         gm = gR[e_left, c]
         gp = gL[e_right, c]
-        εm = ε[e_left]
-        εp = ε[e_right]
-        hm = mesh.Δx[e_left]
-        hp = mesh.Δx[e_right]
-        εbar = T(0.5) * (εm + εp)
-        hbar = T(0.5) * (hm + hp)
-        # Moderate interior penalty (full (p+1)²/h can over-stiffen explicit RK)
-        τ = T(2) * εbar * T(p + 1) / max(hbar, eps(T))
-        return T(0.5) * (gm + gp) - τ * (up - um)
+        τ = br0_tau_1d(ε[e_left], ε[e_right], mesh.Δx[e_left], mesh.Δx[e_right], p)
+        return br0_avg_flux(gm, gp, um, up, τ)
     end
 
     @inbounds for e in 1:(Nel - 1)

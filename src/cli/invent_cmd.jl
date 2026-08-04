@@ -239,6 +239,52 @@ function _parse_robustness_args(args)
     return parse_args(args, s)
 end
 
+function _parse_tune_args(args)
+    s = ArgParseSettings(
+        description=
+            "Coefficient scout on the light quant suite (secondary invent path). " *
+            "Does not append experiment log or change invent frozen scheme.",
+        prog="frforge tune",
+    )
+    @add_arg_table! s begin
+        "--method", "-m"
+        help = "Base registered method factory (e.g. scaled_persson or persson_av)"
+        default = "scaled_persson"
+        "--param"
+        help = "Keyword to grid (default c_av)"
+        default = "c_av"
+        "--values"
+        help = "Comma-separated coefficient list"
+        default = "0.05,0.1,0.2,0.5"
+        "--baseline", "-b"
+        default = "persson_av"
+        "--suite"
+        help = "light (default) or quant"
+        default = "light"
+        "--delta"
+        arg_type = Float64
+        default = DEFAULT_SCORE_MARGIN
+    end
+    return parse_args(args, s)
+end
+
+function cli_tune(args)
+    opts = _parse_tune_args(args)
+    vals = [parse(Float64, strip(x)) for x in split(opts["values"], ',') if !isempty(strip(x))]
+    isempty(vals) && error("--values must list at least one number")
+    suite = Symbol(lowercase(opts["suite"]))
+    suite in (:light, :quant, :m5) || error("--suite must be light or quant")
+    rows = tune_coefficient(
+        opts["method"];
+        param=Symbol(opts["param"]),
+        values=vals,
+        baseline=opts["baseline"],
+        suite=suite === :m5 ? :quant : suite,
+        δ=opts["delta"],
+    )
+    return isempty(rows) ? 1 : 0
+end
+
 function cli_robustness(args)
     opts = _parse_robustness_args(args)
     method = opts["method"]
