@@ -1255,6 +1255,34 @@ Tensor-product Cartesian FR residual runs the same staged hooks as 1D:
 - **CI tier:** `run_p31_2d_capturing_suite` / `frforge test --suite 2d_capturing` uses reduced meshes; full Double Mach etc. deferred to later Phase 3.
 - Residual still never hard-wires method type names.
 
+### 2D benchmarks (Phase 3.3a+)
+
+Core multi-D gates (required CI, light configs only):
+
+| Case | Role | CI config |
+|------|------|-----------|
+| Isentropic vortex order | Exact smooth Euler (MMS-style); NullCapturing | `p=2`, `n∈{8,16}`, `t=0.5`, `L=10` |
+| 2D Riemann (Lax–Liu **cfg 6**) | Multi-wave contacts/shears (positivity-friendly) | `p=1`, `16²`, `t=0.08`, Persson AV |
+
+CLI: `frforge test --suite benchmarks` / `p33a` → `run_p33a_benchmark_suite`.
+
+**Note:** Strong cfg 3 (`config=:cfg3`) is available for research/full runs; on coarse HO meshes it often loses pressure positivity without heavier AV — not a required-CI gate.
+
+### Optional 2D wall benchmarks (Phase 3.3b)
+
+**Not Phase 3 gates.** Full/nightly / `frforge test --suite optional2d` (`p33b`).
+
+| Case | Mechanism | Default |
+|------|-----------|---------|
+| Double-Mach-like | `ReflectingBC` / `GhostStateBC` + inclined shock | `strength=:reduced` (mild Ms≈2-class); `:classic` Ms=10 research-only |
+| Forward-facing step | `mesh.solid` mask + reflecting fluid–solid faces | Reduced domain, `M_in=2` for unit tests |
+
+2D residual supports `Periodic` / `Transmissive` / `Reflecting` / `Dirichlet` / `GhostState` BCs and optional solid-element masks.
+
+### Performance (Phase 4)
+
+Profile → allocation reduction first; optional threading later. 2D residual reuses face/flux work buffers and in-place Rusanov/physical fluxes within each residual evaluation. Arithmetic order is unchanged (no default threading) so outputs match pre-P4 to floating-point noise. Clarity and invent scheme defaults remain frozen.
+
 ### Robustness matrix (Phase 2.3+)
 
 Re-evaluate short-listed methods across scheme axes before any publication-grade claim.

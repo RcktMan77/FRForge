@@ -92,9 +92,10 @@ export FROperators, build_operators, n_points
 export gauss_legendre_nodes_weights, gauss_lobatto_legendre_nodes_weights, differentiation_matrix
 export g_DG_endpoints, g_DG_values_and_derivs, legendre_P
 
-export AbstractBC, PeriodicBC, TransmissiveBC, DirichletBC
+export AbstractBC, PeriodicBC, TransmissiveBC, DirichletBC, ReflectingBC, GhostStateBC
+export reflect_conserved, exterior_state
 export Mesh1D, physical_coords
-export Mesh2D, element_index, element_coords, physical_xy, physical_coords_2d
+export Mesh2D, element_index, element_coords, physical_xy, physical_coords_2d, is_solid
 export MeshMetrics2D, build_mesh_metrics, build_mesh_metrics_analytic_wavy
 export apply_geometry_warp!, make_wavy_mesh2d, is_curved_mesh, wavy_physical, wavy_partials
 
@@ -140,6 +141,10 @@ export run_advection2d_smooth_order, run_euler2d_smooth_order, run_euler2d_disco
 export run_m8_2d_suite, run_p31_2d_capturing_suite
 export run_freestream_preservation_2d, run_advection2d_curved_order
 export run_euler2d_curved_discontinuous, run_p32_curved_suite
+export riemann2d_ic, riemann2d_cfg3_ic, RIEMANN2D_CFG3, RIEMANN2D_CFG6, run_euler2d_riemann
+export isentropic_vortex_primitives, run_isentropic_vortex_order, run_p33a_benchmark_suite
+export double_mach_states, double_mach_ic, run_double_mach_reflection
+export make_ffs_solid_mask, run_forward_facing_step, run_p33b_optional_suite
 
 export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report

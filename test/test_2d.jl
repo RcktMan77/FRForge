@@ -188,3 +188,151 @@ end
     @test isempty(fails)
     @test length(cases) >= 3
 end
+
+@testset "P3.3a isentropic vortex IC + short residual" begin
+    eq = Euler2D(1.4)
+    ρc, uc, vc, pc = isentropic_vortex_primitives(5.0, 5.0, 0.0)
+    @test ρc > 0 && pc > 0 && ρc < 1.0  # core cooler/denser drop
+    ρf, _, _, pf = isentropic_vortex_primitives(0.0, 0.0, 0.0)
+    @test isapprox(ρf, 1.0; rtol=1e-8) && isapprox(pf, 1.0; rtol=1e-8)
+    ops = build_operators(2)
+    mesh = Mesh2D(0.0, 10.0, 0.0, 10.0, 4, 4)
+    state = allocate_state(mesh, ops, Val(4))
+    set_initial_condition!(
+        state,
+        (x, y) -> begin
+            ρi, ui, vi, pi = isentropic_vortex_primitives(x, y, 0.0)
+            primitives_to_conserved(eq, ρi, ui, vi, pi)
+        end,
+    )
+    du = similar(state.u)
+    residual!(du, state, eq, NullCapturing())
+    @test all(isfinite, du)
+    @test positivity_ok(eq, state)
+end
+
+@testset "P3.3a isentropic vortex order CI-light" begin
+    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
+    @test !c["diverged"]
+    @test c["positivity_ok"]
+    @test c["conservation_pass"]
+    @test c["order_pass"]
+    @info "vortex orders=$(c["observed_orders"]) L2=$(c["l2_errors"])"
+end
+
+@testset "P3.3a 2D Riemann cfg6 CI-light" begin
+    c, state, eq = run_euler2d_riemann(;
+        p=1,
+        nx=16,
+        ny=16,
+        t_final=0.08,
+        cfl=0.08,
+        config=:cfg6,
+        method=PerssonAVMethod(; c_av=0.1),
+        method_name="persson_av",
+    )
+    @test c["pass"]
+    @test c["positivity_ok"]
+    @test !c["diverged"]
+    @test positivity_ok(eq, state)
+    @test c["metrics"]["config"] == "cfg6"
+end
+
+@testset "P3.3a benchmark suite" begin
+    cases, overall, fails = run_p33a_benchmark_suite()
+    @test overall
+    @test isempty(fails)
+    @test length(cases) >= 3
+end
+
+@testset "P3.3b reflecting BC freestream wall" begin
+    eq = Euler2D(1.4)
+    ops = build_operators(1)
+    # Uniform flow parallel to a reflecting bottom wall should stay near freestream
+    U0 = primitives_to_conserved(eq, 1.0, 0.5, 0.0, 1.0)
+    mesh = Mesh2D(
+        0.0, 1.0, 0.0, 0.5, 4, 2;
+        left_bc=DirichletBC((x, y, t) -> U0),
+        right_bc=TransmissiveBC(),
+        bottom_bc=ReflectingBC(),
+        top_bc=TransmissiveBC(),
+    )
+    state = allocate_state(mesh, ops, Val(4))
+    set_initial_condition!(state, (x, y) -> U0)
+    result = integrate!(state, eq, NullCapturing(), 0.05; cfl=0.1)
+    @test result.status == :ok
+    @test positivity_ok(eq, state)
+    err = maximum(abs, state.u[:, :, :, 1] .- 1.0)
+    @test err < 0.05
+end
+
+@testset "P3.3b reduced Double Mach smoke" begin
+    c, _, _ = run_double_mach_reflection(;
+        p=1,
+        nx=12,
+        ny=4,
+        t_final=0.03,
+        cfl=0.04,
+        Lx=1.2,
+        Ly=0.4,
+        strength=:reduced,
+        method=PerssonAVMethod(; c_av=0.2),
+        method_name="persson_av",
+        require_positivity=false,
+    )
+    @test !c["diverged"]
+    @test !c["nan_detected"]
+    @test c["pass"]
+end
+
+@testset "P3.3b reduced FFS smoke" begin
+    c, _, _ = run_forward_facing_step(;
+        p=1,
+        nx=12,
+        ny=4,
+        t_final=0.02,
+        cfl=0.025,
+        Lx=1.0,
+        Ly=0.4,
+        step_x=0.3,
+        step_h=0.1,
+        M_in=2.0,
+        method=PerssonAVMethod(; c_av=0.25),
+        method_name="persson_av",
+        require_positivity=false,
+    )
+    @test !c["diverged"]
+    @test !c["nan_detected"]
+    @test c["pass"]
+    @test c["metrics"]["n_solid"] > 0
+end
+
+@testset "P3.3b optional suite" begin
+    cases, overall, fails = run_p33b_optional_suite()
+    @test overall
+    @test isempty(fails)
+    @test length(cases) >= 2
+end
+
+@testset "P4 residual numeric fidelity (FP noise)" begin
+    # Freestream residual still ~ machine zero after buffer-reuse residual
+    eq = Euler2D(1.4)
+    ops = build_operators(2)
+    mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, 4, 4)
+    state = allocate_state(mesh, ops, Val(4))
+    U0 = primitives_to_conserved(eq, 1.0, 0.5, 0.25, 1.0)
+    set_initial_condition!(state, (x, y) -> U0)
+    du = similar(state.u)
+    residual!(du, state, eq, NullCapturing())
+    @test maximum(abs, du) < 1e-12
+    # Deterministic: two residual calls match exactly
+    du2 = similar(state.u)
+    residual!(du2, state, eq, NullCapturing())
+    @test du == du2
+    # Vortex L2 within FP noise of pre-P4 reference (same n_list so fixed-Δt matches)
+    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
+    @test !c["diverged"]
+    @test isapprox(c["l2_errors"][1], 0.02069688015968434; rtol=1e-12, atol=1e-14)
+    @test isapprox(c["l2_errors"][2], 0.0031146731348864697; rtol=1e-12, atol=1e-14)
+    @test isapprox(c["observed_orders"][1], 2.7322606381318906; rtol=1e-10, atol=1e-12)
+end
