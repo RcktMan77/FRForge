@@ -1,0 +1,235 @@
+{
+  "baseline_composite": 0.918663861117966,
+  "baseline_name": "persson_av",
+  "candidate_status": "pass_gates",
+  "cases": [
+    {
+      "capturing_method": "null",
+      "case_type": "smooth_order",
+      "conservation_metric": "periodic_mass_change",
+      "conservation_pass": true,
+      "conservation_residual": 4.570788192381768e-13,
+      "diverged": false,
+      "equation": "euler1d",
+      "formal_order": 3,
+      "l2_errors": [
+        6.319003037353025e-5,
+        8.496378758807548e-6,
+        1.0838434244025756e-6
+      ],
+      "mesh_sizes": [
+        0.0625,
+        0.03125,
+        0.015625
+      ],
+      "metrics": {
+        "cfl": 0.1,
+        "conservation_residual_components": [
+          4.4653170050423786e-13,
+          4.570788192381768e-13,
+          4.43349061166979e-13
+        ],
+        "dt_fixed": 4.1666666666666665e-5,
+        "mass_abs_change_components": [
+          4.4653170050423796e-13,
+          4.570788192381769e-13,
+          1.3300471835009375e-12
+        ],
+        "n_elements_list": [
+          16,
+          32,
+          64
+        ],
+        "t_final": 1.0,
+        "γ": 1.4
+      },
+      "name": "euler_smooth_order_p2",
+      "nan_detected": false,
+      "observed_orders": [
+        2.8947769728925437,
+        2.970691726005145
+      ],
+      "order_pass": true,
+      "order_tolerance": 0.3,
+      "p": 2,
+      "pass": true,
+      "positivity_ok": true,
+      "wall_time_sec": 3.161868095397949
+    },
+    {
+      "capturing_method": "null",
+      "case_type": "smooth_order",
+      "conservation_metric": "periodic_mass_change",
+      "conservation_pass": true,
+      "conservation_residual": 2.863265180508278e-13,
+      "diverged": false,
+      "equation": "euler1d",
+      "formal_order": 4,
+      "l2_errors": [
+        6.914202736301939e-6,
+        3.731417486611999e-7,
+        2.1945873235297692e-8
+      ],
+      "mesh_sizes": [
+        0.125,
+        0.0625,
+        0.03125
+      ],
+      "metrics": {
+        "cfl": 0.1,
+        "conservation_residual_components": [
+          2.863265180508278e-13,
+          2.683409050519003e-13,
+          2.74743191160572e-13
+        ],
+        "dt_fixed": 4.464285714285714e-5,
+        "mass_abs_change_components": [
+          2.8632651805082787e-13,
+          2.6834090505190034e-13,
+          8.242295734817162e-13
+        ],
+        "n_elements_list": [
+          8,
+          16,
+          32
+        ],
+        "t_final": 1.0,
+        "γ": 1.4
+      },
+      "name": "euler_smooth_order_p3",
+      "nan_detected": false,
+      "observed_orders": [
+        4.211767217457794,
+        4.087702202067292
+      ],
+      "order_pass": true,
+      "order_tolerance": 0.3,
+      "p": 3,
+      "pass": true,
+      "positivity_ok": true,
+      "wall_time_sec": 1.615110158920288
+    },
+    {
+      "capturing_method": "scaled_persson",
+      "case_type": "discontinuous",
+      "conservation_metric": "none",
+      "conservation_pass": true,
+      "conservation_residual": 6.924238959982176e-12,
+      "diverged": false,
+      "equation": "euler1d",
+      "excess_dissipation": 0.0007512866425908373,
+      "l1_error_vs_reference": 0.005350868473909069,
+      "method_params": {
+        "av_form": "conservative_br0",
+        "c_av": 0.5,
+        "method": "scaled_persson",
+        "note": "example inventable method; elevated c_av over baseline persson_av",
+        "s0_factor": -4.0,
+        "κ": 4.0
+      },
+      "metrics": {
+        "excess_dissipation_vs_exact": 0.002640289503563504,
+        "excess_dissipation_vs_null": 0.0007512866425908373,
+        "l1_density_vs_exact": 0.005350868473909069,
+        "mass_change": -6.924238959982176e-12,
+        "n_steps": 944,
+        "u_max": 1.0052941376131097,
+        "u_min": 0.11920205822376707
+      },
+      "n_elements": 64,
+      "name": "sod_p2_ne64_scaled_persson",
+      "nan_detected": false,
+      "overshoot": 0.00662621917283763,
+      "p": 2,
+      "pass": true,
+      "positivity_ok": true,
+      "shock_thickness": 2.319857302938907,
+      "shock_thickness_unit": "sp_spacings",
+      "t_final": 0.2,
+      "wall_time_sec": 0.2210831642150879
+    },
+    {
+      "capturing_method": "scaled_persson",
+      "case_type": "discontinuous",
+      "conservation_metric": "none",
+      "conservation_pass": true,
+      "conservation_residual": 18.465662072408467,
+      "diverged": false,
+      "equation": "euler1d",
+      "excess_dissipation": 0.02160288307419353,
+      "l1_error_vs_reference": 0.02292691121347645,
+      "method_params": {
+        "av_form": "conservative_br0",
+        "c_av": 0.5,
+        "method": "scaled_persson",
+        "note": "example inventable method; elevated c_av over baseline persson_av",
+        "s0_factor": -4.0,
+        "κ": 4.0
+      },
+      "metrics": {
+        "mass_change": 18.465662072408467,
+        "n_steps": 2556,
+        "reference_file": "test/data/shu_osher_ref.csv",
+        "u_max": 4.1537397155533435,
+        "u_min": 0.8001720348417449
+      },
+      "n_elements": 100,
+      "name": "shu_osher_p1_ne100_scaled_persson",
+      "nan_detected": false,
+      "overshoot": 0.0,
+      "p": 1,
+      "pass": true,
+      "positivity_ok": true,
+      "shock_thickness": 5.1506964403272555,
+      "shock_thickness_unit": "sp_spacings",
+      "t_final": 1.8,
+      "wall_time_sec": 0.8153209686279297
+    }
+  ],
+  "command": "invent",
+  "composite_margin": 0.0048596947067534035,
+  "diverged": false,
+  "git_commit": "1173cdb",
+  "hard_gate_failures": [],
+  "julia_version": "1.11.7",
+  "method_name": "scaled_persson",
+  "method_params": {
+    "av_form": "conservative_br0",
+    "c_av": 0.5,
+    "method": "scaled_persson",
+    "note": "example inventable method; elevated c_av over baseline persson_av",
+    "s0_factor": -4.0,
+    "κ": 4.0
+  },
+  "nan_detected": false,
+  "overall_pass": true,
+  "package": "FRForge",
+  "package_version": "0.1.0",
+  "schema_version": 1,
+  "score_margin_threshold": 0.02,
+  "scoring_formula_version": 1,
+  "scoring_weights": {
+    "dissipation": 0.25,
+    "order_preservation": 0.3,
+    "robustness": 0.2,
+    "shock_quality": 0.25
+  },
+  "suite": "quant",
+  "summary": {
+    "n_cases": 4,
+    "n_failed": 0,
+    "n_passed": 4,
+    "scores": {
+      "composite": 0.9235235558247195,
+      "dissipation": 0.9441145757080391,
+      "order_preservation": 1.0,
+      "robustness": 1.0,
+      "shock_quality": 0.7499796475908383
+    },
+    "tradeoff_notes": "order_preserved,shock_improved,composite_improved"
+  },
+  "timestamp_utc": "2026-08-03T19:39:08Z",
+  "tradeoff_ok": true,
+  "vtk_produced": false,
+  "wall_time_sec": 6.537583112716675
+}

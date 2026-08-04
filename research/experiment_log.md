@@ -1,7 +1,7 @@
 # FRForge Experiment Log
 
 **Authority:** This file is the laboratory notebook and **authoritative memory** for agents and humans.  
-**Rule:** Always **read this log before proposing a new capturing method**. Append after every invent / robustness evaluation.
+**Rule:** Always **read this log before proposing a new capturing method**. Prefer `frforge log summary` / `frontier` / `lessons` for a quick structured view. Append after every invent / robustness evaluation.
 
 **Frozen invent scheme** (composite-score history): **GL + Rusanov + SSP-RK3** (`DEFAULT_SCHEME`).  
 Do not change defaults for invent comparisons without a **logged re-baseline** entry.  
@@ -18,6 +18,10 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 **Phase 3.3b:** Optional reduced DMR/FFS (full/nightly): reflecting/Ghost BCs + solid mask. Suite: `frforge test --suite optional2d`.
 
 **Phase 4:** Residual buffer reuse + in-place fluxes; invent scheme still GL+Rusanov+SSP-RK3. Outputs stable to FP noise.
+
+**Phase 5.1:** Experiment-log analytics — `frforge log summary|frontier|lessons|show` (read-only).
+
+**Phase 5.2:** Reproducibility snapshots — `frforge snapshot freeze|verify|tables` (freeze after short-list only).
 
 ---
 

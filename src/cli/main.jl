@@ -2,14 +2,15 @@
 
 function _print_usage(io=stderr)
     println(io, "FRForge — high-order Flux Reconstruction laboratory")
-    println(io, "Usage: frforge {test|run|invent|score|log|robustness} [options]")
+    println(io, "Usage: frforge {test|run|invent|score|log|snapshot|robustness} [options]")
     println(io)
     println(io, "Commands:")
     println(io, "  test         Run verification suite and emit JSON report")
     println(io, "  run          Run a single case")
     println(io, "  invent       Run quant suite for a method vs baseline and classify candidate")
     println(io, "  score        Classify two existing JSON reports (method vs baseline)")
-    println(io, "  log          Experiment log: list entries or append from invent reports")
+    println(io, "  log          Experiment log: list|summary|frontier|lessons|show|append")
+    println(io, "  snapshot     Freeze/verify/tables for reproducibility packages")
     println(io, "  robustness   Scheme robustness matrix (CI-light or full/nightly)")
     println(io)
     println(io, "Agent workflow: read research/experiment_log.md before inventing methods.")
@@ -23,6 +24,9 @@ function _print_usage(io=stderr)
     println(io, "  frforge invent --method scaled_persson --baseline persson_av")
     println(io, "  frforge score --method-report a.json --baseline-report b.json")
     println(io, "  frforge log list")
+    println(io, "  frforge log summary")
+    println(io, "  frforge log frontier")
+    println(io, "  frforge log lessons --query c_av")
     println(io, "  frforge robustness --method scaled_persson --matrix ci")
     println(io, "  frforge robustness --method scaled_persson --matrix full   # local/nightly")
     println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
@@ -573,6 +577,69 @@ function _parse_log_args(args)
         opts = parse_args(rest, s)
         opts["sub"] = "list"
         return opts
+    elseif sub == "summary"
+        s = ArgParseSettings(description="Summarize experiment log.", prog="frforge log summary")
+        @add_arg_table! s begin
+            "--path"
+            help = "Path to experiment_log.md"
+            default = ""
+            "--json"
+            help = "Optional path to write machine-readable JSON"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "summary"
+        return opts
+    elseif sub == "frontier"
+        s = ArgParseSettings(description="Frontier / near-miss methods.", prog="frforge log frontier")
+        @add_arg_table! s begin
+            "--path"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "frontier"
+        return opts
+    elseif sub == "lessons"
+        s = ArgParseSettings(description="Index of lessons and weaknesses.", prog="frforge log lessons")
+        @add_arg_table! s begin
+            "--path"
+            default = ""
+            "--query", "-q"
+            help = "Case-insensitive substring filter"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "lessons"
+        return opts
+    elseif sub == "show"
+        s = ArgParseSettings(description="Show one log entry by id.", prog="frforge log show")
+        @add_arg_table! s begin
+            "id"
+            help = "Entry id (### heading)"
+            required = true
+            "--path"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "show"
+        return opts
+    elseif sub == "pareto"
+        s = ArgParseSettings(description="Pareto-style order/dissip/shock table.", prog="frforge log pareto")
+        @add_arg_table! s begin
+            "--path"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "pareto"
+        return opts
     elseif sub == "append"
         s = ArgParseSettings(
             description="Append experiment log entry from two invent JSON reports.",
@@ -609,16 +676,37 @@ function _parse_log_args(args)
     end
 end
 
+function _log_path(opts)
+    p = get(opts, "path", "")
+    return isempty(p) ? default_experiment_log_path() : p
+end
+
+function _maybe_write_json(path::AbstractString, obj)
+    isempty(path) && return nothing
+    mkpath(dirname(path))
+    open(path, "w") do io
+        JSON.print(io, obj, 2)
+    end
+    println("Wrote JSON → $path")
+    return nothing
+end
+
 function cli_log(args)
     opts = _parse_log_args(args)
     sub = opts["sub"]
     if sub == "help"
-        println("Usage: frforge log {list|append} [options]")
-        println("  list    List entry ids in research/experiment_log.md")
-        println("  append  Append from --method-report and --baseline-report")
+        println("Usage: frforge log {list|summary|frontier|pareto|lessons|show|append} [options]")
+        println("  list      List entry ids")
+        println("  summary   Counts, latest per method, narrative TODOs")
+        println("  frontier  Baseline + promising-class + near-miss pass_gates")
+        println("  pareto    Order/dissipation/shock table with non-dominated flags")
+        println("  lessons   Flatten lessons/weaknesses (--query filter)")
+        println("  show <id> Print one full entry")
+        println("  append    Append from invent JSON reports")
+        println("Common: --path log.md  --json out.json")
         return 0
     elseif sub == "list"
-        path = isempty(get(opts, "path", "")) ? default_experiment_log_path() : opts["path"]
+        path = _log_path(opts)
         ids = list_experiment_entry_ids(path)
         println("Experiment log: $path")
         println("n_entries=$(length(ids))")
@@ -626,8 +714,43 @@ function cli_log(args)
             println("  - ", id)
         end
         return 0
+    elseif sub == "summary"
+        entries = parse_experiment_log(_log_path(opts))
+        summary = log_summary(entries)
+        print(format_log_summary_text(summary))
+        _maybe_write_json(get(opts, "json", ""), summary)
+        return 0
+    elseif sub == "frontier"
+        entries = parse_experiment_log(_log_path(opts))
+        rows = log_frontier(entries)
+        print(format_log_frontier_text(rows))
+        _maybe_write_json(get(opts, "json", ""), rows)
+        return 0
+    elseif sub == "pareto"
+        entries = parse_experiment_log(_log_path(opts))
+        rows = log_pareto(entries)
+        print(format_log_pareto_text(rows))
+        _maybe_write_json(get(opts, "json", ""), rows)
+        return 0
+    elseif sub == "lessons"
+        entries = parse_experiment_log(_log_path(opts))
+        q = get(opts, "query", "")
+        rows = log_lessons(entries; query=isempty(q) ? nothing : q)
+        print(format_log_lessons_text(rows))
+        _maybe_write_json(get(opts, "json", ""), rows)
+        return 0
+    elseif sub == "show"
+        entries = parse_experiment_log(_log_path(opts))
+        e = get_experiment_entry(entries, opts["id"])
+        if e === nothing
+            println(stderr, "Entry not found: ", opts["id"])
+            return 1
+        end
+        print(format_log_entry_text(e))
+        _maybe_write_json(get(opts, "json", ""), e)
+        return 0
     elseif sub == "append"
-        path = isempty(get(opts, "path", "")) ? default_experiment_log_path() : opts["path"]
+        path = _log_path(opts)
         met = load_report(opts["method_report"])
         bas = load_report(opts["baseline_report"])
         cmp = classify_candidate(met, bas; δ=opts["delta"], vtk_produced=opts["vtk_produced"])
@@ -666,6 +789,151 @@ function cli_score(args)
         out_path=out,
     )
     return cmp["candidate_status"] == "rejected" ? 1 : 0
+end
+
+function _parse_snapshot_args(args)
+    if isempty(args) || args[1] in ("-h", "--help", "help")
+        return Dict("sub" => "help")
+    end
+    sub = args[1]
+    rest = args[2:end]
+    if sub == "freeze"
+        s = ArgParseSettings(description="Freeze a reproducibility snapshot.", prog="frforge snapshot freeze")
+        @add_arg_table! s begin
+            "--method", "-m"
+            required = true
+            "--baseline", "-b"
+            default = "persson_av"
+            "--method-report"
+            required = true
+            dest_name = "method_report"
+            "--baseline-report"
+            required = true
+            dest_name = "baseline_report"
+            "--compare"
+            default = ""
+            "--out"
+            help = "Snapshot root directory"
+            default = "results/snapshots"
+            "--git-ref"
+            default = ""
+            dest_name = "git_ref"
+            "--source"
+            help = "Extra source file (repeatable escape hatch)"
+            action = :append_arg
+            default = String[]
+            "--no-append-log"
+            action = :store_true
+            dest_name = "no_append_log"
+            "--log-path"
+            default = ""
+            dest_name = "log_path"
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "freeze"
+        return opts
+    elseif sub == "verify"
+        s = ArgParseSettings(
+            description="Verify snapshot (default: cheap hash check; --rerun for invent).",
+            prog="frforge snapshot verify",
+        )
+        @add_arg_table! s begin
+            "path"
+            help = "Snapshot directory"
+            required = true
+            "--rerun"
+            help = "Explicit full invent re-run (slow; not for required CI)"
+            action = :store_true
+            "--require-git-ref"
+            action = :store_true
+            dest_name = "require_git_ref"
+            "--tol-rel"
+            arg_type = Float64
+            default = 1e-10
+            dest_name = "tol_rel"
+            "--tol-abs"
+            arg_type = Float64
+            default = 1e-12
+            dest_name = "tol_abs"
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "verify"
+        return opts
+    elseif sub == "tables"
+        s = ArgParseSettings(description="Tables from frozen snapshot JSON.", prog="frforge snapshot tables")
+        @add_arg_table! s begin
+            "path"
+            required = true
+            "--out"
+            help = "Markdown output path"
+            default = ""
+            "--csv"
+            help = "CSV output path"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "tables"
+        return opts
+    else
+        return Dict("sub" => "unknown", "cmd" => sub)
+    end
+end
+
+function cli_snapshot(args)
+    opts = _parse_snapshot_args(args)
+    sub = opts["sub"]
+    if sub == "help"
+        println("Usage: frforge snapshot {freeze|verify|tables}")
+        println("  freeze   Package method sources + reports + hashes (immutable)")
+        println("  verify   Cheap hash/manifest check (default); add --rerun for invent")
+        println("  tables   Markdown/CSV comparison tables from frozen JSON")
+        println("Freeze only after short-list / robustness — not after every invent run.")
+        return 0
+    elseif sub == "freeze"
+        compare = isempty(opts["compare"]) ? nothing : opts["compare"]
+        log_path = isempty(opts["log_path"]) ? default_experiment_log_path() : opts["log_path"]
+        extra = String.(opts["source"])
+        dir = freeze_snapshot(;
+            method=opts["method"],
+            baseline=opts["baseline"],
+            method_report=opts["method_report"],
+            baseline_report=opts["baseline_report"],
+            compare=compare,
+            out_root=opts["out"],
+            git_ref=opts["git_ref"],
+            source_extra=extra,
+            log_path=log_path,
+            append_log=!opts["no_append_log"],
+        )
+        println("Snapshot frozen: $dir")
+        return 0
+    elseif sub == "verify"
+        res = verify_snapshot(
+            opts["path"];
+            rerun=opts["rerun"],
+            tol_rel=opts["tol_rel"],
+            tol_abs=opts["tol_abs"],
+            require_git_ref=opts["require_git_ref"],
+        )
+        println("mode=$(res["mode"]) ok=$(res["ok"]) method=$(res["method"])")
+        if !isempty(res["errors"])
+            for e in res["errors"]
+                println(stderr, "  ERROR: ", e)
+            end
+        end
+        return res["ok"] ? 0 : 1
+    elseif sub == "tables"
+        out_md = isempty(opts["out"]) ? nothing : opts["out"]
+        out_csv = isempty(opts["csv"]) ? nothing : opts["csv"]
+        tab = snapshot_tables(opts["path"]; out_md=out_md, out_csv=out_csv)
+        print(tab["markdown"])
+        out_md !== nothing && println("Wrote $out_md")
+        out_csv !== nothing && println("Wrote $out_csv")
+        return 0
+    else
+        println(stderr, "Unknown snapshot subcommand: ", get(opts, "cmd", sub))
+        return 2
+    end
 end
 
 function _parse_robustness_args(args)
@@ -782,6 +1050,8 @@ function main_cli(args=ARGS)
             return cli_score(rest)
         elseif cmd == "log"
             return cli_log(rest)
+        elseif cmd == "snapshot"
+            return cli_snapshot(rest)
         elseif cmd == "robustness"
             return cli_robustness(rest)
         else
