@@ -244,3 +244,72 @@ end
     @test isempty(fails)
     @test length(cases) >= 3
 end
+
+@testset "P3.3b reflecting BC freestream wall" begin
+    eq = Euler2D(1.4)
+    ops = build_operators(1)
+    # Uniform flow parallel to a reflecting bottom wall should stay near freestream
+    U0 = primitives_to_conserved(eq, 1.0, 0.5, 0.0, 1.0)
+    mesh = Mesh2D(
+        0.0, 1.0, 0.0, 0.5, 4, 2;
+        left_bc=DirichletBC((x, y, t) -> U0),
+        right_bc=TransmissiveBC(),
+        bottom_bc=ReflectingBC(),
+        top_bc=TransmissiveBC(),
+    )
+    state = allocate_state(mesh, ops, Val(4))
+    set_initial_condition!(state, (x, y) -> U0)
+    result = integrate!(state, eq, NullCapturing(), 0.05; cfl=0.1)
+    @test result.status == :ok
+    @test positivity_ok(eq, state)
+    err = maximum(abs, state.u[:, :, :, 1] .- 1.0)
+    @test err < 0.05
+end
+
+@testset "P3.3b reduced Double Mach smoke" begin
+    c, _, _ = run_double_mach_reflection(;
+        p=1,
+        nx=12,
+        ny=4,
+        t_final=0.03,
+        cfl=0.04,
+        Lx=1.2,
+        Ly=0.4,
+        strength=:reduced,
+        method=PerssonAVMethod(; c_av=0.2),
+        method_name="persson_av",
+        require_positivity=false,
+    )
+    @test !c["diverged"]
+    @test !c["nan_detected"]
+    @test c["pass"]
+end
+
+@testset "P3.3b reduced FFS smoke" begin
+    c, _, _ = run_forward_facing_step(;
+        p=1,
+        nx=12,
+        ny=4,
+        t_final=0.02,
+        cfl=0.025,
+        Lx=1.0,
+        Ly=0.4,
+        step_x=0.3,
+        step_h=0.1,
+        M_in=2.0,
+        method=PerssonAVMethod(; c_av=0.25),
+        method_name="persson_av",
+        require_positivity=false,
+    )
+    @test !c["diverged"]
+    @test !c["nan_detected"]
+    @test c["pass"]
+    @test c["metrics"]["n_solid"] > 0
+end
+
+@testset "P3.3b optional suite" begin
+    cases, overall, fails = run_p33b_optional_suite()
+    @test overall
+    @test isempty(fails)
+    @test length(cases) >= 2
+end

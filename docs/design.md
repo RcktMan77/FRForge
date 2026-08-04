@@ -1268,7 +1268,16 @@ CLI: `frforge test --suite benchmarks` / `p33a` → `run_p33a_benchmark_suite`.
 
 **Note:** Strong cfg 3 (`config=:cfg3`) is available for research/full runs; on coarse HO meshes it often loses pressure positivity without heavier AV — not a required-CI gate.
 
-**Optional / reduced (P3.3b, not Phase 3 gates):** Double Mach reflection, forward-facing step — full/nightly only when present.
+### Optional 2D wall benchmarks (Phase 3.3b)
+
+**Not Phase 3 gates.** Full/nightly / `frforge test --suite optional2d` (`p33b`).
+
+| Case | Mechanism | Default |
+|------|-----------|---------|
+| Double-Mach-like | `ReflectingBC` / `GhostStateBC` + inclined shock | `strength=:reduced` (mild Ms≈2-class); `:classic` Ms=10 research-only |
+| Forward-facing step | `mesh.solid` mask + reflecting fluid–solid faces | Reduced domain, `M_in=2` for unit tests |
+
+2D residual supports `Periodic` / `Transmissive` / `Reflecting` / `Dirichlet` / `GhostState` BCs and optional solid-element masks.
 
 ### Robustness matrix (Phase 2.3+)
 

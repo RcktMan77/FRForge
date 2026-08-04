@@ -256,6 +256,12 @@ function cli_test(opts::AbstractDict)
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
         method = "mixed"
+    elseif suite in ("optional2d", "p33b", "dmr", "ffs")
+        # Full/nightly optional benchmarks (not required CI)
+        cases, overall_pass, hard_fails = run_p33b_optional_suite()
+        diverged = any(c -> get(c, "diverged", false) === true, cases)
+        nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+        method = "persson_av"
     elseif suite == "full"
         c1, p1, f1 = run_m1_advection_suite()
         c2, p2, f2 = run_m2_burgers_suite()
