@@ -101,3 +101,35 @@ end
         @test info.n_cells == 2
     end
 end
+
+@testset "2D VTU capturing diagnostics (docs path)" begin
+    # Optional sensor/av fields — documentation only, not invent default
+    c, state, eq = run_euler2d_riemann(;
+        p=1,
+        nx=6,
+        ny=6,
+        t_final=0.02,
+        cfl=0.05,
+        method=PerssonAVMethod(; c_av=0.1),
+        method_name="persson_av",
+    )
+    @test !c["diverged"]
+    method = PerssonAVMethod(; c_av=0.1)
+    σ, ε = compute_capturing_diagnostics_2d(state, eq, method)
+    @test length(σ) == state.mesh.n_elements
+    @test all(σ .>= 0)
+    mktempdir() do dir
+        path = joinpath(dir, "riemann_diag.vtu")
+        write_vtu_high_order_with_capturing(path, state, eq, method)
+        txt = read(path, String)
+        @test occursin("Name=\"rho\"", txt)
+        @test occursin("Name=\"sensor\"", txt)
+        @test occursin("Name=\"av\"", txt)
+        # default writer still omits diagnostics
+        path2 = joinpath(dir, "plain.vtu")
+        write_vtu_high_order(path2, state, eq)
+        txt2 = read(path2, String)
+        @test occursin("Name=\"rho\"", txt2)
+        @test !occursin("Name=\"sensor\"", txt2)
+    end
+end
