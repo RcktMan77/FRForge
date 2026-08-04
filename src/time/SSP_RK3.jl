@@ -80,6 +80,8 @@ function ssp_rk3!(
     cfl::Real=0.2,
     dt::Union{Nothing,Real}=nothing,
     max_steps::Int=10^7,
+    progress_every::Int=0,
+    progress_label::AbstractString="",
 ) where {T,Neq}
     t_final_T = T(t_final)
     du = similar(state.u)
@@ -96,6 +98,15 @@ function ssp_rk3!(
         end
         status = ssp_rk3_step!(state, eq, method, step_dt; du=du, u0=u0, u1=u1, u2=u2)
         n_steps += 1
+        if progress_every > 0 && (n_steps % progress_every == 0)
+            pct = 100 * Float64(state.t) / max(Float64(t_final_T), eps(Float64))
+            lbl = isempty(progress_label) ? "ssp_rk3" : progress_label
+            println(
+                "  [$lbl] step=$n_steps  t=$(round(Float64(state.t); digits=5))/" *
+                "$(round(Float64(t_final_T); digits=5))  ($(round(pct; digits=1))%)",
+            )
+            flush(stdout)
+        end
         if status != :ok
             return (status=status, n_steps=n_steps, t=state.t)
         end
@@ -160,6 +171,8 @@ function ssp_rk3!(
     cfl::Real=0.2,
     dt::Union{Nothing,Real}=nothing,
     max_steps::Int=10^7,
+    progress_every::Int=0,
+    progress_label::AbstractString="",
 ) where {T,Neq}
     t_final_T = T(t_final)
     du = similar(state.u)
@@ -168,6 +181,7 @@ function ssp_rk3!(
     u2 = similar(state.u)
     fixed_dt = dt === nothing ? nothing : T(dt)
     n_steps = 0
+    t_wall0 = time()
     while state.t < t_final_T - 10 * eps(T)
         step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl=cfl) : fixed_dt
         if state.t + step_dt > t_final_T
@@ -175,6 +189,17 @@ function ssp_rk3!(
         end
         status = ssp_rk3_step!(state, eq, method, step_dt; du=du, u0=u0, u1=u1, u2=u2)
         n_steps += 1
+        if progress_every > 0 && (n_steps % progress_every == 0)
+            pct = 100 * Float64(state.t) / max(Float64(t_final_T), eps(Float64))
+            lbl = isempty(progress_label) ? "ssp_rk3_2d" : progress_label
+            elapsed = time() - t_wall0
+            println(
+                "  [$lbl] step=$n_steps  t=$(round(Float64(state.t); digits=5))/" *
+                "$(round(Float64(t_final_T); digits=5))  ($(round(pct; digits=1))%)  " *
+                "wall=$(round(elapsed; digits=1))s",
+            )
+            flush(stdout)
+        end
         if status != :ok
             return (status=status, n_steps=n_steps, t=state.t)
         end

@@ -1,4 +1,5 @@
-# Gauss–Legendre nodes and weights on [-1, 1], differentiation matrix, Lagrange basis.
+# FR reference points & Lagrange tools (1D).
+# Layout (fr/): Points → Correction → Operators → Threading → ResidualWorkspace → Residual(1D/2D).
 
 """
     gauss_legendre_nodes_weights(n; T=Float64) -> (ξ, w)

@@ -36,7 +36,7 @@ end
 """
     empty_scores() -> Dict
 
-Placeholder score components (null until M5/M6 fill them).
+Unset score components (`nothing` until filled by scoring helpers).
 """
 function empty_scores()
     return Dict{String,Any}(
@@ -51,8 +51,8 @@ end
 """
     report_skeleton(; kwargs...) -> Dict{String,Any}
 
-Build a schema v1 report skeleton with no cases.
-Valid for M0; later milestones append cases and fill scores.
+Build a schema v1 report skeleton (optionally empty cases).
+Callers append cases and fill scores as needed.
 """
 function report_skeleton(;
     command::AbstractString = "test",

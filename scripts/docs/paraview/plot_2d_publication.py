@@ -40,13 +40,24 @@ def parse_args(argv=None):
     p.add_argument(
         "--subdiv",
         type=int,
-        default=4,
-        help="Tessellate MaximumNumberofSubdivisions (HO refinement)",
+        default=8,
+        help="Tessellate MaximumNumberofSubdivisions (HO interior sampling; default 8)",
+    )
+    p.add_argument(
+        "--image-res",
+        type=int,
+        default=0,
+        help="ResampleToImage resolution on longest axis (0=auto: 1600 riemann / 2000 dmr)",
+    )
+    p.add_argument(
+        "--no-resample",
+        action="store_true",
+        help="Skip ResampleToImage (Schlieren then uses discontinuous field)",
     )
     p.add_argument(
         "--schlieren-pct",
         type=float,
-        default=99.0,
+        default=98.0,
         help="Upper percentile for Schlieren color range (contrast)",
     )
     p.add_argument("--width", type=int, default=0, help="Screenshot width (0=auto)")
@@ -338,13 +349,13 @@ def _view_size_for_case(case, bounds, width, height):
     dy = max(ymax - ymin, 1e-12)
     aspect = dx / dy
     if case == "dmr":
-        # wide domain
-        w = 2000
-        h = max(int(w / aspect), 500)
+        # wide domain — high pixel density for oblique shocks
+        w = 2400
+        h = max(int(w / aspect), 600)
     else:
-        # square-ish
-        w = 1600
-        h = 1600
+        # square-ish — dense enough that residual element banding is sub-pixel
+        w = 2000
+        h = 2000
     return w, h
 
 
@@ -446,7 +457,7 @@ def _export_lineouts(src, lines, csv_path, png_path):
         pol.Point1 = list(p0)
         pol.Point2 = list(p1)
         try:
-            pol.Resolution = 800
+            pol.Resolution = 1600
         except Exception:
             pass
         UpdatePipeline(proxy=pol)
@@ -537,21 +548,106 @@ def _tessellate(reader, subdiv):
         t.MaximumNumberofSubdivisions = int(subdiv)
     except Exception:
         pass
+    # Very tight chord error → dense sampling of HO polynomials inside each element
     try:
-        t.ChordError = 1.0e-4
+        t.ChordError = 5.0e-6
     except Exception:
         pass
     try:
-        t.MergePoints = 1
+        t.FieldError = 5.0e-6
+    except Exception:
+        pass
+    # Keep discontinuous face nodes separate (avoids smearing jumps into bands)
+    try:
+        t.MergePoints = 0
     except Exception:
         pass
     try:
         t.OutputDimension = 2
     except Exception:
-        # 2 may not be valid on all builds; leave default
         pass
     UpdatePipeline(proxy=t)
     return t
+
+
+def _range_is_valid(rng):
+    """True if (lo, hi) looks like a real VTK data range (not empty ±1e299)."""
+    if rng is None:
+        return False
+    lo, hi = float(rng[0]), float(rng[1])
+    if not (lo == lo and hi == hi):  # NaN
+        return False
+    if abs(lo) > 1e100 or abs(hi) > 1e100:
+        return False
+    return hi >= lo
+
+
+def _resample_to_image(src, bounds, case, image_res):
+    """
+    Sample the (tessellated) discontinuous field onto a fine structured image.
+    Gradients on this continuous field avoid mesh-aligned face-jump spikes.
+
+    ParaView 6.1 note: for planar z=const data, UseInputBounds=1 with
+    SamplingDimensions=[nx,ny,1] is reliable. Custom SamplingBounds with
+    nz=1 and artificial z-padding can yield zero valid points.
+    """
+    from paraview.simple import ResampleToImage, UpdatePipeline
+
+    xmin, xmax, ymin, ymax = bounds[0], bounds[1], bounds[2], bounds[3]
+    dx = max(xmax - xmin, 1e-12)
+    dy = max(ymax - ymin, 1e-12)
+    if image_res <= 0:
+        # Dense enough that element faces are sub-pixel after screenshot supersample
+        image_res = 2000 if case == "dmr" else 1600
+    if dx >= dy:
+        nx = int(image_res)
+        ny = max(int(round(image_res * dy / dx)), 64)
+    else:
+        ny = int(image_res)
+        nx = max(int(round(image_res * dx / dy)), 64)
+
+    ri = ResampleToImage(Input=src)
+    # Prefer input bounds — correct for our planar 2D HO VTUs
+    try:
+        ri.UseInputBounds = 1
+    except Exception:
+        pass
+    try:
+        ri.SamplingDimensions = [nx, ny, 1]
+    except Exception:
+        ri.SamplingDimensions = [nx, ny, 2]
+    UpdatePipeline(proxy=ri)
+
+    # Validate: empty range means probe failed — retry with nz=2 + explicit bounds
+    rr = _array_range(ri, "rho", "POINTS")
+    if not _range_is_valid(rr):
+        print("  WARNING: ResampleToImage empty range; retry nz=2 + explicit bounds")
+        try:
+            from paraview.simple import Delete
+
+            Delete(ri)
+        except Exception:
+            pass
+        z0, z1 = bounds[4], bounds[5]
+        if abs(z1 - z0) < 1e-14:
+            z0, z1 = -1e-6, 1e-6
+        ri = ResampleToImage(Input=src)
+        try:
+            ri.UseInputBounds = 0
+            ri.SamplingBounds = [xmin, xmax, ymin, ymax, z0, z1]
+        except Exception:
+            ri.UseInputBounds = 1
+        try:
+            ri.SamplingDimensions = [nx, ny, 2]
+        except Exception:
+            pass
+        UpdatePipeline(proxy=ri)
+        rr = _array_range(ri, "rho", "POINTS")
+
+    print("  ResampleToImage: %d x %d  rho_range=%s" % (nx, ny, rr))
+    if not _range_is_valid(rr):
+        print("  WARNING: resample still invalid — caller should fall back to tessellated field")
+    return ri
 
 
 def main(argv=None):
@@ -579,7 +675,6 @@ def main(argv=None):
 
     print("Reading", vtu)
     reader = XMLUnstructuredGridReader(FileName=[vtu])
-    # Load all arrays
     try:
         reader.CellArrayStatus = reader.CellArrayStatus
         reader.PointArrayStatus = reader.PointArrayStatus
@@ -599,42 +694,65 @@ def main(argv=None):
         base = (os.path.basename(vtu) + " " + prefix).lower()
         case = "dmr" if ("double_mach" in base or "dmr" in base) else "riemann"
 
-    # HO tessellation so Lagrange interiors are visible
+    # 1) Tessellate HO Lagrange interiors (dense sampling inside elements)
     if args.no_tessellate:
-        source = reader
+        tess = reader
         print("Tessellate: skipped")
     else:
-        print("Tessellate: subdivisions=%d" % args.subdiv)
-        source = _tessellate(reader, args.subdiv)
-        print("  refined PointData:", _point_array_names(source))
+        print("Tessellate: subdivisions=%d (MergePoints=0)" % args.subdiv)
+        tess = _tessellate(reader, args.subdiv)
+        print("  tessellated PointData:", _point_array_names(tess))
 
-    bounds = _bounds(source)
+    bounds = _bounds(tess)
+
+    # 2) Continuous image sample for smooth pressure + Schlieren (kills face banding)
+    if args.no_resample:
+        continuous = tess
+        print("ResampleToImage: skipped")
+    else:
+        print("ResampleToImage (continuous field for pressure/Schlieren)…")
+        continuous = _resample_to_image(tess, bounds, case, args.image_res)
+        print("  continuous PointData:", _point_array_names(continuous))
+        # Fall back if probe produced empty/invalid arrays (blank PNGs)
+        if not _range_is_valid(_array_range(continuous, "rho", "POINTS")):
+            print("  FALLBACK: using tessellated field (resample invalid)")
+            continuous = tess
+
     width, height = _view_size_for_case(case, bounds, args.width, args.height)
     print("View size: %dx%d  bounds: %s" % (width, height, bounds))
     view = _setup_view((width, height))
 
-    # Data ranges for pressure (clamp negatives for display — numerical overshoots)
-    prange = _array_range(source, "p", "POINTS")
-    if prange:
+    # Pressure range from continuous field (prefer tessellated range if continuous is odd)
+    prange = _array_range(continuous, "p", "POINTS")
+    if not _range_is_valid(prange):
+        prange = _array_range(tess, "p", "POINTS")
+    if _range_is_valid(prange):
         plo = max(prange[0], 0.0) if prange[0] < 0 else prange[0]
-        # Soft-clip high outliers via samples if available
-        psamples = _fetch_point_scalar_samples(source, "p")
+        psamples = _fetch_point_scalar_samples(continuous, "p")
+        if psamples:
+            # Drop non-finite / extreme sentinel values
+            psamples = [v for v in psamples if v == v and abs(v) < 1e100]
         if psamples:
             phi = _percentile(psamples, 99.5)
             plo2 = _percentile(psamples, 0.5)
-            plo = max(plo, plo2) if plo2 is not None else plo
-            if plo2 is not None and plo2 < 0:
+            if plo2 is not None and plo2 >= 0:
+                plo = plo2
+            elif plo2 is not None and plo2 < 0:
                 plo = 0.0
-            phi = phi if phi and phi > plo else prange[1]
+            phi = phi if phi is not None and phi > plo else prange[1]
         else:
             phi = prange[1]
-        prange = (plo, phi)
+        if phi > plo:
+            prange = (plo, phi)
         print("  pressure display range:", prange)
+    else:
+        prange = None
+        print("  WARNING: no valid pressure range")
 
-    # ---- Pressure ----
+    # ---- Pressure (continuous resample) ----
     print("Pressure…")
     _hide_all(view)
-    disp = Show(source, view)
+    disp = Show(continuous, view)
     disp.Representation = "Surface"
     try:
         disp.InterpolateScalarsBeforeMapping = 1
@@ -648,13 +766,13 @@ def main(argv=None):
         rng=prange,
         show_bar=args.colorbar,
     )
-    _tight_camera(view, bounds, (width, height), margin=0.02)
+    _tight_camera(view, bounds, (width, height), margin=0.015)
     _save(view, os.path.join(outdir, "%s_pressure.png" % prefix), width, height, args.res)
 
-    # ---- Schlieren |∇ρ| on tessellated field ----
-    print("Schlieren…")
+    # ---- Schlieren on continuous ρ (avoids DG face-jump spikes) ----
+    print("Schlieren (gradient on ResampleToImage density)…")
     _hide_all(view)
-    grad = Gradient(Input=source)
+    grad = Gradient(Input=continuous)
     try:
         grad.ScalarArray = ["POINTS", "rho"]
     except Exception as e:
@@ -691,18 +809,21 @@ def main(argv=None):
     else:
         calc = Calculator(Input=grad)
         calc.ResultArrayName = "schlieren"
-        # magnitude of density gradient
         calc.Function = "mag(%s)" % gvec
         UpdatePipeline(proxy=calc)
 
-        # Contrast: use [0, Pth percentile] rather than absolute max outliers
         samples = _fetch_point_scalar_samples(calc, "schlieren")
+        if samples:
+            samples = [v for v in samples if v == v and 0.0 <= v < 1e100]
         hi = _percentile(samples, args.schlieren_pct) if samples else None
         lo = 0.0
         if hi is None or not (hi > lo):
             rr = _array_range(calc, "schlieren", "POINTS")
-            hi = rr[1] if rr else 1.0
-        # Avoid degenerate range
+            if _range_is_valid(rr) and rr[1] > lo:
+                hi = rr[1]
+            else:
+                hi = 1.0
+                print("  WARNING: schlieren range fallback hi=1")
         if hi <= lo:
             hi = lo + 1.0
         print("  schlieren color range: [%.4g, %.4g] (pct=%.1f)" % (lo, hi, args.schlieren_pct))
@@ -723,7 +844,7 @@ def main(argv=None):
             show_bar=args.colorbar,
             schlieren_white_to_black=True,
         )
-        _tight_camera(view, bounds, (width, height), margin=0.02)
+        _tight_camera(view, bounds, (width, height), margin=0.015)
         _save(
             view,
             os.path.join(outdir, "%s_schlieren.png" % prefix),
@@ -737,35 +858,62 @@ def main(argv=None):
         except Exception:
             pass
 
-    # ---- Sensor / AV ----
+    # ---- Sensor / AV: prefer continuous resample (less Cartesian blockiness) ----
     print("Sensor / AV…")
     field = None
     assoc = "POINTS"
-    # Prefer point-expanded sensor from FRForge writer
-    if "sensor" in _point_array_names(source):
+    # Prefer continuous image sample when available (sensor is element-local but
+    # dense resample removes hard quad edges that dominate coarse screenshots).
+    cont_points = _point_array_names(continuous)
+    cont_cells = _cell_array_names(continuous)
+    tess_points = _point_array_names(tess)
+    tess_cells = _cell_array_names(tess)
+    sensor_src = continuous
+    if "sensor" in cont_points:
         field, assoc = "sensor", "POINTS"
-    elif "sensor" in _cell_array_names(source):
+    elif "sensor" in cont_cells:
         field, assoc = "sensor", "CELLS"
-    elif "av" in _point_array_names(source):
+    elif "av" in cont_points:
         field, assoc = "av", "POINTS"
-    elif "av" in _cell_array_names(source):
+    elif "av" in cont_cells:
         field, assoc = "av", "CELLS"
+    elif "sensor" in tess_points:
+        field, assoc, sensor_src = "sensor", "POINTS", tess
+    elif "sensor" in tess_cells:
+        field, assoc, sensor_src = "sensor", "CELLS", tess
+    elif "av" in tess_points:
+        field, assoc, sensor_src = "av", "POINTS", tess
+    elif "av" in tess_cells:
+        field, assoc, sensor_src = "av", "CELLS", tess
 
     if field is None:
         print("  WARNING: no sensor/av in VTU")
     else:
-        srange = _array_range(source, field, assoc)
-        # Soft upper clip at 99th percentile for visibility of weak activations
+        srange = _array_range(sensor_src, field, assoc)
+        if not _range_is_valid(srange):
+            srange = _array_range(tess, field, assoc if field in _point_array_names(tess) or field in _cell_array_names(tess) else "POINTS")
+            if not _range_is_valid(srange):
+                srange = _array_range(tess, field, "POINTS") or _array_range(tess, field, "CELLS")
+            if sensor_src is not tess and _range_is_valid(_array_range(tess, field, "POINTS")):
+                sensor_src = tess
+                assoc = "POINTS" if field in _point_array_names(tess) else "CELLS"
+                srange = _array_range(tess, field, assoc)
         if assoc == "POINTS":
-            samples = _fetch_point_scalar_samples(source, field)
+            samples = _fetch_point_scalar_samples(sensor_src, field)
+            if samples:
+                samples = [v for v in samples if v == v and abs(v) < 1e100]
             if samples:
                 hi = _percentile(samples, 99.5)
-                lo = 0.0
-                if hi and hi > lo:
+                lo = max(0.0, _percentile(samples, 0.5) or 0.0)
+                if hi is not None and hi > lo:
                     srange = (lo, hi)
-        print("  %s range:" % field, srange)
+        if not _range_is_valid(srange):
+            srange = None
+        print("  %s range:" % field, srange, "(src=%s)" % (
+            "resampled" if sensor_src is continuous else "tessellated"
+        ))
         _hide_all(view)
-        d3 = Show(source, view)
+        d3 = Show(sensor_src, view)
         d3.Representation = "Surface"
         try:
             d3.InterpolateScalarsBeforeMapping = 1
@@ -779,7 +927,7 @@ def main(argv=None):
             rng=srange,
             show_bar=args.colorbar,
         )
-        _tight_camera(view, bounds, (width, height), margin=0.02)
+        _tight_camera(view, bounds, (width, height), margin=0.015)
         _save(
             view,
             os.path.join(outdir, "%s_sensor.png" % prefix),
@@ -788,11 +936,11 @@ def main(argv=None):
             args.res,
         )
 
-    # ---- Line-outs on tessellated field ----
+    # ---- Line-outs on continuous field (smooth, less interface noise) ----
     print("Line-outs…")
     lines = _lineout_presets(case, bounds)
     _export_lineouts(
-        source,
+        continuous,
         lines,
         os.path.join(outdir, "%s_lineout.csv" % prefix),
         os.path.join(outdir, "%s_lineout.png" % prefix),

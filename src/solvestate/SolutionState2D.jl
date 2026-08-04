@@ -14,6 +14,7 @@ mutable struct SolutionState2D{T,Neq}
     ops::FROperators{T}
     scheme::SchemeConfig
     metrics::MeshMetrics2D{T}
+    residual_ws::Any  # ResidualWorkspace2D{T} | nothing (lazy)
 end
 
 function allocate_state(
@@ -38,7 +39,7 @@ function allocate_state(
     else
         build_mesh_metrics(mesh, ops)
     end
-    return SolutionState2D{T,Neq}(u, zero(T), ops.p, mesh, ops, sch, met)
+    return SolutionState2D{T,Neq}(u, zero(T), ops.p, mesh, ops, sch, met, nothing)
 end
 
 function allocate_state(

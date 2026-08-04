@@ -1,4 +1,68 @@
-# Top-level invent / score orchestration.
+# Top-level invent / score orchestration (coarse quant + classify).
+# Fine-mesh path lives in Confirm.jl; scheme matrix in Robustness.jl.
+
+"""Attach classify_candidate fields onto the method report dict (in-place)."""
+function _attach_candidate_fields!(met::AbstractDict, cmp::AbstractDict)
+    met["candidate_status"] = cmp["candidate_status"]
+    met["baseline_composite"] = cmp["baseline_composite"]
+    met["composite_margin"] = cmp["composite_margin"]
+    met["score_margin_threshold"] = cmp["score_margin_threshold"]
+    met["vtk_produced"] = cmp["vtk_produced"]
+    met["tradeoff_ok"] = cmp["tradeoff_ok"]
+    met["summary"]["tradeoff_notes"] = cmp["tradeoff_notes"]
+    met["summary"]["scores"] = cmp["absolute_scores"]
+    return met
+end
+
+function _invent_append_if_requested!(
+    method_name,
+    met,
+    bas,
+    cmp;
+    append_log::Bool,
+    log_path,
+    yaml_path,
+    met_path,
+    bas_path,
+    cmp_path,
+    hypothesis,
+    lessons,
+    strengths,
+    weaknesses,
+    git_ref,
+)
+    append_log || return nothing
+    lp = something(log_path, default_experiment_log_path())
+    yp = yaml_path === nothing ? default_experiment_log_yaml_path() : yaml_path
+    # empty string yaml_path disables YAML index update
+    yp_use = (yp isa AbstractString && isempty(yp)) ? nothing : yp
+    arts = Dict{String,Any}(
+        "method_report" => met_path,
+        "baseline_report" => bas_path,
+        "compare" => cmp_path,
+    )
+    entry = invent_append_log!(
+        method_name,
+        met,
+        bas,
+        cmp;
+        log_path=lp,
+        yaml_path=yp_use,
+        artifacts=arts,
+        hypothesis=hypothesis,
+        lessons=lessons,
+        strengths=strengths,
+        weaknesses=weaknesses,
+        git_ref=git_ref,
+    )
+    println("Experiment log appended: $(entry["id"])  →  $lp")
+    if get(entry, "narrative_complete", true) === false
+        println(
+            "  WARNING: hypothesis/lessons are placeholders — required for promising+ before shortlist.",
+        )
+    end
+    return entry
+end
 
 """
     invent_method(method_name; baseline="persson_av", report_dir="results/invent",
@@ -28,10 +92,12 @@ function invent_method(
     weaknesses::AbstractString="",
     git_ref::AbstractString="",
 )
+    method_name = require_registered_method(method_name)
+    baseline = require_registered_method(baseline; role="baseline")
+
     mkpath(report_dir)
-    bas_path = joinpath(report_dir, "baseline_$(baseline).json")
-    met_path = joinpath(report_dir, "method_$(method_name).json")
-    cmp_path = joinpath(report_dir, "compare_$(method_name)_vs_$(baseline).json")
+    paths = report_trio_paths(report_dir, method_name, baseline)
+    bas_path, met_path, cmp_path = paths.baseline, paths.method, paths.compare
 
     println("Reminder: read research/experiment_log.md before proposing new methods.")
     println(
@@ -45,72 +111,39 @@ function invent_method(
 
     println("Running baseline suite: $baseline ...")
     bas = run_method_report(baseline; seed=seed)
-    bas["command"] = "invent"
-    bas["baseline_name"] = nothing
-    bas["scheme"] = scheme_dict(DEFAULT_SCHEME)
+    stamp_workflow_report!(bas; command="invent", baseline_name=nothing, scheme=DEFAULT_SCHEME)
     write_report(bas_path, bas)
 
     println("Running method suite: $method_name ...")
     met = run_method_report(method_name; seed=seed)
-    met["command"] = "invent"
-    met["baseline_name"] = baseline
-    met["scheme"] = scheme_dict(DEFAULT_SCHEME)
+    stamp_workflow_report!(met; command="invent", baseline_name=baseline, scheme=DEFAULT_SCHEME)
     write_report(met_path, met)
 
     cmp = classify_candidate(met, bas; δ=δ, vtk_produced=vtk_produced)
-    # Attach comparison onto method report for agent convenience
-    met["candidate_status"] = cmp["candidate_status"]
-    met["baseline_composite"] = cmp["baseline_composite"]
-    met["composite_margin"] = cmp["composite_margin"]
-    met["score_margin_threshold"] = cmp["score_margin_threshold"]
-    met["vtk_produced"] = cmp["vtk_produced"]
-    met["tradeoff_ok"] = cmp["tradeoff_ok"]
-    met["summary"]["tradeoff_notes"] = cmp["tradeoff_notes"]
-    met["summary"]["scores"] = cmp["absolute_scores"]
-    # re-write method report with invent fields
+    _attach_candidate_fields!(met, cmp)
     write_report(met_path, met)
-
-    open(cmp_path, "w") do io
-        JSON.print(io, cmp, 2)
-        println(io)
-    end
+    write_json_pretty(cmp_path, cmp)
 
     print_candidate_summary(method_name, cmp)
-    println("Reports: $met_path")
-    println("         $bas_path")
-    println("         $cmp_path")
+    print_report_trio(met_path, bas_path, cmp_path)
 
-    if append_log
-        lp = something(log_path, default_experiment_log_path())
-        yp = yaml_path === nothing ? default_experiment_log_yaml_path() : yaml_path
-        # empty string yaml_path disables YAML index update
-        yp_use = (yp isa AbstractString && isempty(yp)) ? nothing : yp
-        arts = Dict{String,Any}(
-            "method_report" => met_path,
-            "baseline_report" => bas_path,
-            "compare" => cmp_path,
-        )
-        entry = invent_append_log!(
-            method_name,
-            met,
-            bas,
-            cmp;
-            log_path=lp,
-            yaml_path=yp_use,
-            artifacts=arts,
-            hypothesis=hypothesis,
-            lessons=lessons,
-            strengths=strengths,
-            weaknesses=weaknesses,
-            git_ref=git_ref,
-        )
-        println("Experiment log appended: $(entry["id"])  →  $lp")
-        if get(entry, "narrative_complete", true) === false
-            println(
-                "  WARNING: hypothesis/lessons are placeholders — required for promising+ before shortlist.",
-            )
-        end
-    end
+    _invent_append_if_requested!(
+        method_name,
+        met,
+        bas,
+        cmp;
+        append_log=append_log,
+        log_path=log_path,
+        yaml_path=yaml_path,
+        met_path=met_path,
+        bas_path=bas_path,
+        cmp_path=cmp_path,
+        hypothesis=hypothesis,
+        lessons=lessons,
+        strengths=strengths,
+        weaknesses=weaknesses,
+        git_ref=git_ref,
+    )
 
     return met, bas, cmp
 end
@@ -132,10 +165,7 @@ function score_reports(
     cmp = classify_candidate(met, bas; δ=δ, vtk_produced=vtk_produced)
     print_candidate_summary(get(met, "method_name", "method"), cmp)
     if out_path !== nothing
-        open(out_path, "w") do io
-            JSON.print(io, cmp, 2)
-            println(io)
-        end
+        write_json_pretty(out_path, cmp)
         println("Wrote $out_path")
     end
     return cmp

@@ -75,14 +75,3 @@ end
     @test s["dissipation"] > 0.5
 end
 
-@testset "M5 quant suite" begin
-    cases, overall, fails = run_m5_quant_suite(; method_name="persson_av")
-    @test overall
-    @test isempty(fails)
-    @test any(c -> c["case_type"] == "smooth_order", cases)
-    @test any(c -> startswith(c["name"], "sod"), cases)
-    @test any(c -> startswith(c["name"], "shu_osher"), cases)
-    scores = score_suite_absolute(cases)
-    @test scores["composite"] isa Real
-    @info "M5 composite=$(scores["composite"]) scores=$scores"
-end

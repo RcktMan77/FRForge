@@ -1,5 +1,5 @@
 # HLLC approximate Riemann solver for compressible Euler (Toro).
-# Used as the less-dissipative flux corner in the Phase 2 robustness matrix.
+# Optional less-dissipative Euler interface flux (robustness / exploration; not invent default).
 
 """
     hllc_flux(eq::Euler1D, uL, uR) -> numerical flux

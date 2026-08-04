@@ -31,14 +31,19 @@ end
         fake_cell(; points=:gl, flux=:hllc, time=:ssp_rk2, ok=true, cand="pass_gates"),
         fake_cell(; points=:gll, flux=:rusanov, time=:ssp_rk3, ok=true, cand="pass_gates"),
     ]
-    a = assess_publication_grade(cells; narrative_complete=true)
+    a = assess_publication_grade(cells; narrative_complete=true, confirm_passed=true)
     @test a["eligible"] == true
     @test a["recommended_status"] == "publication_grade"
+
+    # Missing fine-mesh confirm
+    a0 = assess_publication_grade(cells; narrative_complete=true, confirm_passed=false)
+    @test a0["eligible"] == false
+    @test any(r -> r["id"] == "fine_mesh_confirm" && r["ok"] == false, a0["rules"])
 
     # HLLC failure
     cells_bad = copy(cells)
     cells_bad[2] = fake_cell(; points=:gll, flux=:hllc, time=:ssp_rk3, ok=false)
-    a2 = assess_publication_grade(cells_bad; narrative_complete=true)
+    a2 = assess_publication_grade(cells_bad; narrative_complete=true, confirm_passed=true)
     @test a2["eligible"] == false
     @test any(r -> r["id"] == "hllc_robust" && r["ok"] == false, a2["rules"])
 
@@ -47,11 +52,11 @@ end
         fake_cell(; points=:gl, flux=:rusanov, time=:ssp_rk3, ok=true, cand="pass_gates"),
         fake_cell(; points=:gll, flux=:hllc, time=:ssp_rk3, ok=true),
     ]
-    a3 = assess_publication_grade(cells3; narrative_complete=true)
+    a3 = assess_publication_grade(cells3; narrative_complete=true, confirm_passed=true)
     @test a3["eligible"] == false
 
     # Narrative incomplete
-    a4 = assess_publication_grade(cells; narrative_complete=false)
+    a4 = assess_publication_grade(cells; narrative_complete=false, confirm_passed=true)
     @test a4["eligible"] == false
 end
 

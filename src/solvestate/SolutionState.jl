@@ -13,6 +13,7 @@ mutable struct SolutionState{T,Neq}
     mesh::Mesh1D{T}
     ops::FROperators{T}
     scheme::SchemeConfig
+    residual_ws::Any  # ResidualWorkspace1D{T} | nothing (lazy)
 end
 
 """
@@ -34,7 +35,7 @@ function allocate_state(
         scheme,
         SchemeConfig(; points=ops.points, flux=DEFAULT_SCHEME.flux, time=DEFAULT_SCHEME.time),
     )
-    return SolutionState{T,Neq}(u, zero(T), ops.p, mesh, ops, sch)
+    return SolutionState{T,Neq}(u, zero(T), ops.p, mesh, ops, sch, nothing)
 end
 
 function allocate_state(

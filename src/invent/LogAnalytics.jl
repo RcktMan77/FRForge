@@ -1,4 +1,4 @@
-# Experiment-log analytics (Phase 5.1) — read-only knowledge layer.
+# Experiment-log analytics — read-only knowledge layer over research/experiment_log.md.
 #
 # Parses research/experiment_log.md into structured entries and produces
 # summary / frontier / Pareto / lessons views for humans and agents.
@@ -9,12 +9,14 @@ const FRONTIER_CANDIDATE = Set([
     "accepted_candidate",
     "publication_grade",
     "baseline",
+    "confirmed",
 ])
 
 const FRONTIER_LAB_STATUS = Set([
     "shortlisted",
     "publication_grade",
     "baseline",
+    "confirmed",
 ])
 
 """Default composite margin for near-miss (pass_gates) inclusion on frontier."""
@@ -229,6 +231,7 @@ function log_summary(entries::AbstractVector)
     by_cand = Dict{String,Int}()
     latest = Dict{String,Dict{String,Any}}()
     todos = Dict{String,Any}[]
+    confirm_failed = Dict{String,Any}[]
 
     for e in entries
         st = String(get(e, "status", "unknown"))
@@ -259,6 +262,21 @@ function log_summary(entries::AbstractVector)
                 ),
             )
         end
+
+        # Surface fine-mesh confirmation failures so agents do not retry blindly
+        conf = string(get(get(e, "metrics", Dict()), "confirmation_status", ""))
+        if st == "confirmation_failed" || conf == "confirmation_failed"
+            push!(
+                confirm_failed,
+                Dict{String,Any}(
+                    "id" => get(e, "id", ""),
+                    "method" => meth,
+                    "date" => get(e, "date", ""),
+                    "caution" => "confirmation_failed — read lessons/artifacts before retrying fine-mesh confirm",
+                    "mesh" => get(get(e, "metrics", Dict()), "mesh", nothing),
+                ),
+            )
+        end
     end
 
     return Dict{String,Any}(
@@ -275,6 +293,7 @@ function log_summary(entries::AbstractVector)
             ) for (k, v) in pairs(latest)
         ),
         "narrative_todos" => todos,
+        "confirmation_failed" => confirm_failed,
     )
 end
 
@@ -486,6 +505,21 @@ function format_log_summary_text(summary::AbstractDict)
         println(io, "Narrative TODOs ($(length(todos))):")
         for t in todos
             println(io, "  ", t["id"], " method=", t["method"])
+        end
+    end
+    fails = get(summary, "confirmation_failed", Any[])
+    if !isempty(fails)
+        println(io, "CAUTION — confirmation_failed ($(length(fails))):")
+        for f in fails
+            println(
+                io,
+                "  ",
+                get(f, "id", "?"),
+                " method=",
+                get(f, "method", "?"),
+                "  ",
+                get(f, "caution", ""),
+            )
         end
     end
     return String(take!(io))

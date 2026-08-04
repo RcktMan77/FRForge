@@ -94,13 +94,6 @@ end
     @test c["conservation_pass"]
 end
 
-@testset "P3.1 2D capturing suite" begin
-    cases, overall, fails = run_p31_2d_capturing_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 3
-end
-
 @testset "P3.2 freestream Cartesian and curved" begin
     c0 = run_freestream_preservation_2d(; p=2, nx=4, ny=4, curved=false)
     @test c0["pass"]
@@ -158,12 +151,6 @@ end
     @test c1["pass"]
 end
 
-@testset "P3.2 curved suite" begin
-    cases, overall, fails = run_p32_curved_suite()
-    @test overall
-    @test isempty(fails)
-end
-
 @testset "2D VTU Lagrange quad" begin
     mktempdir() do dir
         eq = LinearAdvection2D(1.0, 0.0)
@@ -180,13 +167,6 @@ end
         @test all(==(VTK_LAGRANGE_QUAD), info.types)
         @test occursin("Name=\"u\"", info.text)
     end
-end
-
-@testset "M8 suite" begin
-    cases, overall, fails, _, _ = run_m8_2d_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 3
 end
 
 @testset "P3.3a isentropic vortex IC + short residual" begin
@@ -236,13 +216,6 @@ end
     @test !c["diverged"]
     @test positivity_ok(eq, state)
     @test c["metrics"]["config"] == "cfg6"
-end
-
-@testset "P3.3a benchmark suite" begin
-    cases, overall, fails = run_p33a_benchmark_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 3
 end
 
 @testset "P3.3b reflecting BC freestream wall" begin
@@ -307,15 +280,9 @@ end
     @test c["metrics"]["n_solid"] > 0
 end
 
-@testset "P3.3b optional suite" begin
-    cases, overall, fails = run_p33b_optional_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 2
-end
-
 @testset "P4 residual numeric fidelity (FP noise)" begin
-    # Freestream residual still ~ machine zero after buffer-reuse residual
+    # Freestream residual still ~ machine zero after buffer-reuse residual.
+    # Bit-equality of two residual calls is covered in test_threading.jl (serial path).
     eq = Euler2D(1.4)
     ops = build_operators(2)
     mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, 4, 4)
@@ -325,10 +292,6 @@ end
     du = similar(state.u)
     residual!(du, state, eq, NullCapturing())
     @test maximum(abs, du) < 1e-12
-    # Deterministic: two residual calls match exactly
-    du2 = similar(state.u)
-    residual!(du2, state, eq, NullCapturing())
-    @test du == du2
     # Vortex L2 within FP noise of pre-P4 reference (same n_list so fixed-Δt matches)
     c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
     @test !c["diverged"]

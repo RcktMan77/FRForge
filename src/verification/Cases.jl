@@ -1,4 +1,4 @@
-# Verification cases for Milestone 1 (linear advection).
+# Verification cases: 1D advection, Burgers, Euler, capturing, quant (Sod / Shu–Osher).
 
 """
     _order_study_dt(p, Ne_fine, a; cfl, t_final)
@@ -171,7 +171,7 @@ end
 """
     run_m1_advection_suite() -> (cases, overall_pass, hard_gate_failures)
 
-Run M1 verification: conservation + order for p=2,3,4.
+Run 1D advection verification: conservation + order for p=2,3,4.
 """
 function run_m1_advection_suite()
     cases = Any[]
@@ -202,7 +202,7 @@ function run_m1_advection_suite()
 end
 
 # ---------------------------------------------------------------------------
-# Milestone 2 — inviscid Burgers
+# --- 1D inviscid Burgers ---
 # ---------------------------------------------------------------------------
 
 """Periodic square-wave IC for Burgers oscillation demo on [0,1].
@@ -271,7 +271,7 @@ end
 
 Discontinuous Burgers with pure high-order FR (NullCapturing).
 
-Success for M2 means the run completes, conserves, and **exhibits** Gibbs-type
+Success means the run completes, conserves, and **exhibits** Gibbs-type
 oscillations (overshoot above IC max or undershoot below IC min). That documents
 the failure mode that shock-capturing methods later aim to fix.
 """
@@ -306,7 +306,7 @@ function run_burgers_oscillation(;
     diverged = result.status != :ok
     nan_detected = diverged || has_nonfinite(state.u)
 
-    # M2 success: oscillations present (this is the expected HO failure mode)
+    # Success: oscillations present (expected HO failure mode without capturing)
     oscillations_present = η >= min_overshoot
     # Case "pass" means demo succeeded: ran, conserved, and showed oscillations
     case_pass = cpass && !diverged && !nan_detected && oscillations_present
@@ -327,7 +327,7 @@ function run_burgers_oscillation(;
         "wall_time_sec" => time() - t0,
         "n_elements" => n_elements,
         "t_final" => t_final,
-        "excess_dissipation" => nothing,  # no NullCapturing reference needed for M2 demo
+        "excess_dissipation" => nothing,  # no NullCapturing reference needed for oscillation demo
         "shock_thickness" => nothing,
         "shock_thickness_unit" => "sp_spacings",
         "overshoot" => η,
@@ -345,7 +345,7 @@ function run_burgers_oscillation(;
             "min_overshoot_required" => min_overshoot,
             "oscillations_present" => oscillations_present,
             "n_steps" => result.n_steps,
-            "note" => "M2 documents HO oscillatory failure of NullCapturing; oscillations are expected",
+            "note" => "Documents HO oscillatory failure of NullCapturing; oscillations are expected",
         ),
     )
 end
@@ -385,7 +385,7 @@ function run_m2_burgers_suite()
 end
 
 # ---------------------------------------------------------------------------
-# Milestone 3 — 1D Euler + BCs + smooth order
+# --- 1D Euler + BCs + smooth order ---
 # ---------------------------------------------------------------------------
 
 """
@@ -731,7 +731,7 @@ function run_m3_euler_suite()
 end
 
 # ---------------------------------------------------------------------------
-# Milestone 4 — capturing interface + Persson AV baseline
+# --- Capturing interface + Persson AV baseline ---
 # ---------------------------------------------------------------------------
 
 """
@@ -835,7 +835,7 @@ function run_persson_vs_null_burgers(;
             "overshoot_null" => η_null,
             "overshoot_persson" => η,
             "overshoot_reduced" => reduced,
-            "note" => "M4 baseline: Persson AV should reduce HO overshoot vs NullCapturing",
+            "note" => "Persson AV baseline: should reduce HO overshoot vs NullCapturing",
         ),
     )
 
@@ -899,7 +899,7 @@ function run_m4_capturing_suite()
 end
 
 # ---------------------------------------------------------------------------
-# Milestone 5 — quantitative suite: Sod, Shu–Osher, scored summary
+# --- Quantitative suite: Sod, Shu–Osher, scored summary ---
 # ---------------------------------------------------------------------------
 
 """Shu–Osher IC on [0, 10] (classic [-5,5] shifted by +5).
@@ -960,7 +960,7 @@ function run_sod(;
     MT = discrete_mass(state, 1)
     # Open BC: mass not conserved; report change as diagnostic only
     cres = conservation_residual_absolute(M0, MT)
-    cpass = true  # telescoping not integrated in M5 v1; unit path via freestream BC tests
+    cpass = true  # Sod open domain: conservation not scored; freestream BC tests cover telescoping
 
     x, ρ = sample_solution_1d(state, eq; component=:density)
     umin, umax = solution_extrema(state, 1)

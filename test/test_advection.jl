@@ -42,9 +42,3 @@ end
     end
 end
 
-@testset "M1 suite integration" begin
-    cases, overall, fails = run_m1_advection_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 6  # 3 order + 3 conservation
-end

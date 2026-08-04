@@ -1,5 +1,9 @@
 # Agent invention surface: register methods under src/methods/ only.
 #
+# Layout (methods/):
+#   Registry.jl        — list/describe/require + includes method files
+#   ScaledPersson.jl   — example inventable method (composition demo)
+#
 # Workflow:
 #   1. Create src/methods/MyMethod.jl implementing AbstractCapturingMethod hooks
 #   2. include it from this file
@@ -23,6 +27,19 @@ function describe_methods()
         println(io, "  - ", name)
     end
     return String(take!(io))
+end
+
+"""
+    require_registered_method(name; role="method") -> String
+
+Return `name` as `String`, or throw with the registered-method list.
+Internal helper for CLI / invent / confirm entry points.
+"""
+function require_registered_method(name::AbstractString; role::AbstractString="method")
+    key = String(name)
+    haskey(METHOD_REGISTRY, key) ||
+        error("Unknown $role \"$key\". $(describe_methods())")
+    return key
 end
 
 # Example inventable method (structural composition of Persson with different defaults)
