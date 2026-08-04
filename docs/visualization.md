@@ -39,41 +39,36 @@ For a candidate: same scripts, change `--method` / VTU tag (e.g. `scaled_persson
 
 ## Exact commands (local)
 
-### 1. Generate VTU (Julia)
+### 1. Generate presentation VTU (Julia)
 
-From the repository root:
+From the repository root. **`--preset presentation`** uses meshes finer than CI-light
+(same \(p\) and \(t_f\) as the documentation baseline). Not used by invent or required CI.
+
+| Case | Presentation mesh | \(p\) | \(t_f\) | CI-light (for comparison) |
+|------|-------------------|------|---------|---------------------------|
+| Riemann cfg6 | \(80\times 80\) | 2 | 0.15 | \(16\times 16\), \(p=1\), \(t=0.08\) |
+| DMR reduced | \(120\times 40\) | 1 | 0.08 | \(16\times 4\), \(t=0.03\) |
 
 ```bash
-# Baseline (Persson AV) — denser than CI for cleaner figures
+# Baseline (Persson AV) — presentation quality
 julia --project=. scripts/docs/run_vtu_cases.jl \
+  --preset presentation \
   --method persson_av \
   --outdir results/docs_vtu \
   --tag baseline
 
-# Optional: candidate method
+# Optional: candidate method (same meshes)
 julia --project=. scripts/docs/run_vtu_cases.jl \
+  --preset presentation \
   --method scaled_persson \
   --outdir results/docs_vtu \
   --tag scaled_persson
+
+# Faster smoke (coarser): --preset quick
 ```
 
-Equivalent one-off CLI (with diagnostics):
-
-```bash
-# Riemann cfg6
-./bin/frforge run --case riemann2d --p 2 --ne 48 --t-final 0.15 --cfl 0.06 \
-  --method persson_av \
-  --output results/docs_vtu/riemann_cfg6_baseline.vtu \
-  --vtk-diagnostics
-
-# Reduced Double Mach
-./bin/frforge run --case double_mach --p 1 --ne 60 --ny 20 --t-final 0.08 --cfl 0.04 \
-  --method persson_av \
-  --output results/docs_vtu/double_mach_baseline.vtu \
-  --vtk-diagnostics
-```
-
-Expected VTU files from the driver:
+VTU includes `rho`, `p`, … plus **`sensor`** and **`av`** via
+`write_vtu_high_order_with_capturing` (documentation path only).
 
 | File | Case |
 |------|------|
@@ -82,10 +77,11 @@ Expected VTU files from the driver:
 
 ### 2. Generate images (`pvpython`)
 
-Point `pvpython` at your ParaView install if it is not on `PATH` (required on most macOS installs):
+The script **tessellates** HO Lagrange cells, computes Schlieren on the refined field,
+uses percentile-based contrast, tight framing, and high-resolution PNGs.
 
 ```bash
-# macOS — use the pvpython inside the ParaView app (tested: 6.1.0)
+# macOS — ParaView app pvpython (tested: 6.1.0)
 export PVPYTHON="/Applications/ParaView-6.1.0.app/Contents/bin/pvpython"
 
 # Riemann
@@ -93,16 +89,17 @@ $PVPYTHON scripts/docs/paraview/plot_2d_publication.py \
   --vtu results/docs_vtu/riemann_cfg6_baseline.vtu \
   --outdir results/docs_figures \
   --prefix riemann_cfg6_baseline \
-  --case riemann
+  --case riemann \
+  --subdiv 4 --schlieren-pct 99 --res 3
 
 # Double Mach
 $PVPYTHON scripts/docs/paraview/plot_2d_publication.py \
   --vtu results/docs_vtu/double_mach_baseline.vtu \
   --outdir results/docs_figures \
   --prefix double_mach_baseline \
-  --case dmr
+  --case dmr \
+  --subdiv 4 --schlieren-pct 99 --res 3
 ```
-
 ### 3. Candidate method (same pipeline)
 
 ```bash

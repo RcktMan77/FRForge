@@ -1,22 +1,67 @@
 #!/usr/bin/env julia
-# Documentation-only VTU driver for publication figures.
-# NOT used by invent or required CI.
+# Documentation / presentation VTU driver (NOT invent, NOT required CI).
 #
 # Usage (from repo root):
-#   julia --project=. scripts/docs/run_vtu_cases.jl
-#   julia --project=. scripts/docs/run_vtu_cases.jl --method persson_av
-#   julia --project=. scripts/docs/run_vtu_cases.jl --method scaled_persson --outdir results/docs_vtu
+#   # Presentation-quality meshes (default) — finer than CI-light
+#   julia --project=. scripts/docs/run_vtu_cases.jl \
+#     --method persson_av --outdir results/docs_vtu --tag baseline
+#
+#   # Explicit presets
+#   julia --project=. scripts/docs/run_vtu_cases.jl --preset presentation --tag baseline
+#   julia --project=. scripts/docs/run_vtu_cases.jl --preset quick        # coarser smoke
 #
 # Writes high-order VTU with sensor + av diagnostics for:
 #   1) 2D Riemann cfg6
 #   2) Reduced Double-Mach-like
+#
+# Frozen invent scheme GL+Rusanov+SSP-RK3 is not modified.
 
 using FRForge
 using ArgParse
 
+"""Presentation vs quick (smoke) mesh presets. Polynomial degree and t_final match baseline docs."""
+function apply_preset!(opts, preset::AbstractString)
+    if preset == "presentation"
+        # Noticeably finer than CI-light (cfg6 CI uses ~16² p=1; DMR CI ~12×4)
+        opts["riemann_n"] = 80
+        opts["riemann_p"] = 2
+        opts["riemann_t"] = 0.15
+        opts["riemann_cfl"] = 0.05
+        opts["dmr_nx"] = 120
+        opts["dmr_ny"] = 40
+        opts["dmr_p"] = 1
+        opts["dmr_t"] = 0.08
+        opts["dmr_cfl"] = 0.035
+    elseif preset == "quick"
+        opts["riemann_n"] = 32
+        opts["riemann_p"] = 2
+        opts["riemann_t"] = 0.12
+        opts["riemann_cfl"] = 0.06
+        opts["dmr_nx"] = 48
+        opts["dmr_ny"] = 16
+        opts["dmr_p"] = 1
+        opts["dmr_t"] = 0.06
+        opts["dmr_cfl"] = 0.04
+    elseif preset == "ci"
+        # Match CI-light gates (for smoke only)
+        opts["riemann_n"] = 16
+        opts["riemann_p"] = 1
+        opts["riemann_t"] = 0.08
+        opts["riemann_cfl"] = 0.08
+        opts["dmr_nx"] = 16
+        opts["dmr_ny"] = 4
+        opts["dmr_p"] = 1
+        opts["dmr_t"] = 0.03
+        opts["dmr_cfl"] = 0.04
+    else
+        error("Unknown preset \"$preset\" (use presentation|quick|ci)")
+    end
+    return opts
+end
+
 function parse_cli(args)
     s = ArgParseSettings(
-        description="Run documentation VTU cases (Riemann cfg6 + reduced DMR).",
+        description="Documentation VTU cases (Riemann cfg6 + reduced DMR).",
         prog="run_vtu_cases.jl",
     )
     @add_arg_table! s begin
@@ -29,36 +74,57 @@ function parse_cli(args)
         "--tag"
         help = "Filename tag (default: method name)"
         default = ""
+        "--preset"
+        help = "Mesh preset: presentation (default) | quick | ci"
+        default = "presentation"
+        # Optional overrides (0 / NaN = use preset)
         "--riemann-n"
         arg_type = Int
-        default = 48
+        default = 0
         dest_name = "riemann_n"
         "--riemann-p"
         arg_type = Int
-        default = 2
+        default = -1
         dest_name = "riemann_p"
         "--riemann-t"
         arg_type = Float64
-        default = 0.15
+        default = NaN
         dest_name = "riemann_t"
         "--dmr-nx"
         arg_type = Int
-        default = 60
+        default = 0
         dest_name = "dmr_nx"
         "--dmr-ny"
         arg_type = Int
-        default = 20
+        default = 0
         dest_name = "dmr_ny"
         "--dmr-p"
         arg_type = Int
-        default = 1
+        default = -1
         dest_name = "dmr_p"
         "--dmr-t"
         arg_type = Float64
-        default = 0.08
+        default = NaN
         dest_name = "dmr_t"
     end
-    return parse_args(args, s)
+    opts = parse_args(args, s)
+    # materialize preset then apply explicit overrides
+    base = Dict{String,Any}()
+    apply_preset!(base, opts["preset"])
+    for k in keys(base)
+        haskey(opts, k) || (opts[k] = base[k])
+    end
+    # overrides only when user passed non-sentinel
+    opts["riemann_n"] = opts["riemann_n"] > 0 ? opts["riemann_n"] : base["riemann_n"]
+    opts["riemann_p"] = opts["riemann_p"] >= 0 ? opts["riemann_p"] : base["riemann_p"]
+    opts["riemann_t"] = isnan(opts["riemann_t"]) ? base["riemann_t"] : opts["riemann_t"]
+    opts["riemann_cfl"] = base["riemann_cfl"]
+    opts["dmr_nx"] = opts["dmr_nx"] > 0 ? opts["dmr_nx"] : base["dmr_nx"]
+    opts["dmr_ny"] = opts["dmr_ny"] > 0 ? opts["dmr_ny"] : base["dmr_ny"]
+    opts["dmr_p"] = opts["dmr_p"] >= 0 ? opts["dmr_p"] : base["dmr_p"]
+    opts["dmr_t"] = isnan(opts["dmr_t"]) ? base["dmr_t"] : opts["dmr_t"]
+    opts["dmr_cfl"] = base["dmr_cfl"]
+    return opts
 end
 
 function main(args=ARGS)
@@ -69,18 +135,25 @@ function main(args=ARGS)
     outdir = opts["outdir"]
     mkpath(outdir)
 
-    println("=== Documentation VTU driver ===")
+    println("=== Documentation VTU driver (preset=$(opts["preset"])) ===")
     println("method=$method_name  outdir=$outdir  tag=$tag")
-    println("scheme=GL+Rusanov+SSP-RK3 (frozen invent defaults; not reconfigured here)")
+    println("scheme=GL+Rusanov+SSP-RK3 (frozen invent defaults; not reconfigured)")
+    println(
+        "Riemann: p=$(opts["riemann_p"]) n=$(opts["riemann_n"])² t=$(opts["riemann_t"]) cfl=$(opts["riemann_cfl"])",
+    )
+    println(
+        "DMR:     p=$(opts["dmr_p"]) nx=$(opts["dmr_nx"]) ny=$(opts["dmr_ny"]) t=$(opts["dmr_t"]) cfl=$(opts["dmr_cfl"])",
+    )
 
     # --- 1) Riemann cfg6 ---
     println("\n--- 2D Riemann cfg6 ---")
+    t0 = time()
     c_r, state_r, eq_r = run_euler2d_riemann(;
         p=opts["riemann_p"],
         nx=opts["riemann_n"],
         ny=opts["riemann_n"],
         t_final=opts["riemann_t"],
-        cfl=0.06,
+        cfl=opts["riemann_cfl"],
         config=:cfg6,
         method=method,
         method_name=method_name,
@@ -90,17 +163,20 @@ function main(args=ARGS)
         @error "Riemann run failed" pass = c_r["pass"] diverged = c_r["diverged"]
     else
         write_vtu_high_order_with_capturing(path_r, state_r, eq_r, method)
-        println("pass=$(c_r["pass"]) pos=$(c_r["positivity_ok"]) → $path_r")
+        println(
+            "pass=$(c_r["pass"]) pos=$(c_r["positivity_ok"]) wall=$(round(time()-t0;digits=1))s → $path_r",
+        )
     end
 
     # --- 2) Reduced Double Mach ---
     println("\n--- Double Mach (strength=:reduced) ---")
+    t0 = time()
     c_d, state_d, eq_d = run_double_mach_reflection(;
         p=opts["dmr_p"],
         nx=opts["dmr_nx"],
         ny=opts["dmr_ny"],
         t_final=opts["dmr_t"],
-        cfl=0.04,
+        cfl=opts["dmr_cfl"],
         Lx=1.5,
         Ly=0.5,
         strength=:reduced,
@@ -113,16 +189,20 @@ function main(args=ARGS)
         @error "DMR run failed" pass = c_d["pass"] diverged = c_d["diverged"]
     else
         write_vtu_high_order_with_capturing(path_d, state_d, eq_d, method)
-        println("pass=$(c_d["pass"]) pos=$(c_d["positivity_ok"]) → $path_d")
+        println(
+            "pass=$(c_d["pass"]) pos=$(c_d["positivity_ok"]) wall=$(round(time()-t0;digits=1))s → $path_d",
+        )
     end
 
-    println("\nDone. Next: run ParaView scripts, e.g.")
-    println("  pvpython scripts/docs/paraview/plot_2d_publication.py \\\\")
-    println("    --vtu $path_r --outdir results/docs_figures --prefix riemann_cfg6_baseline")
+    println("\nDone. Generate figures with:")
+    println("  export PVPYTHON=/Applications/ParaView-6.1.0.app/Contents/bin/pvpython")
+    println("  \$PVPYTHON scripts/docs/paraview/plot_2d_publication.py \\")
+    println("    --vtu $path_r --outdir results/docs_figures --prefix riemann_cfg6_$(tag) --case riemann")
+    println("  \$PVPYTHON scripts/docs/paraview/plot_2d_publication.py \\")
+    println("    --vtu $path_d --outdir results/docs_figures --prefix double_mach_$(tag) --case dmr")
     return 0
 end
 
-# Parenthesize @__FILE__ so it is not parsed as a macro spanning `&&`.
 if abspath(PROGRAM_FILE) == abspath(@__FILE__)
     main()
 end
