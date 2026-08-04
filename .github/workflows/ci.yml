@@ -16,12 +16,11 @@ jobs:
     name: Change detection
     runs-on: ubuntu-latest
     outputs:
-      code: ${{ steps.filter.outputs.code }}
+      code: ${{ steps.set.outputs.code }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
-        # On push to main/develop, always treat as code so full suite runs.
         if: github.event_name == 'pull_request'
         with:
           filters: |
@@ -33,10 +32,16 @@ jobs:
               - 'bin/**'
               - '.github/workflows/**'
               - 'scripts/**/*.jl'
-      - name: Force full suite on push
-        if: github.event_name == 'push'
-        id: filter
-        run: echo "code=true" >> "$GITHUB_OUTPUT"
+      - name: Set code output
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Always full suite on pushes to main/develop
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            # PRs: dorny/paths-filter sets steps.filter.outputs.code
+            echo "code=${{ steps.filter.outputs.code }}" >> "$GITHUB_OUTPUT"
+          fi
 
   # Required check names stay "Julia 1.10/1.11 - ubuntu-latest" for branch protection.
   # Docs-only PRs run a package-load smoke under the same job names.
