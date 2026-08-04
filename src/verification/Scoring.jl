@@ -78,7 +78,7 @@ end
 Fill `report["summary"]["scores"]` using absolute maps.
 (Relative maps are applied in invent classification, not here.)
 """
-function apply_scores!(report::AbstractDict; baseline=nothing)
+function apply_scores!(report::AbstractDict; baseline = nothing)
     cases = get(report, "cases", Any[])
     scores = score_suite_absolute(cases)
     report["summary"]["scores"] = scores

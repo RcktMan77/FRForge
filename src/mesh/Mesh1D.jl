@@ -24,9 +24,9 @@ function Mesh1D(
     x_left,
     x_right,
     n_elements::Int;
-    left_bc::AbstractBC=PeriodicBC(),
-    right_bc::AbstractBC=PeriodicBC(),
-    T::Type=Float64,
+    left_bc::AbstractBC = PeriodicBC(),
+    right_bc::AbstractBC = PeriodicBC(),
+    T::Type = Float64,
 )
     n_elements >= 1 || throw(ArgumentError("n_elements must be >= 1"))
     x_right > x_left || throw(ArgumentError("x_right must be > x_left"))
@@ -35,7 +35,7 @@ function Mesh1D(
             throw(ArgumentError("Periodic BC must be set on both ends"))
     end
 
-    xv = collect(range(T(x_left), T(x_right); length=n_elements + 1))
+    xv = collect(range(T(x_left), T(x_right); length = n_elements + 1))
     Δx = diff(xv)
     J = Δx ./ T(2)
     return Mesh1D{T}(n_elements, xv, Δx, J, left_bc, right_bc)

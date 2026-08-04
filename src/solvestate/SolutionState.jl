@@ -26,14 +26,14 @@ function allocate_state(
     mesh::Mesh1D{T},
     ops::FROperators{T},
     ::Val{Neq};
-    scheme::Union{Nothing,SchemeConfig}=nothing,
+    scheme::Union{Nothing,SchemeConfig} = nothing,
 ) where {T,Neq}
     Np = n_points(ops)
     Nel = mesh.n_elements
     u = zeros(T, Np, Nel, Neq)
     sch = something(
         scheme,
-        SchemeConfig(; points=ops.points, flux=DEFAULT_SCHEME.flux, time=DEFAULT_SCHEME.time),
+        SchemeConfig(; points = ops.points, flux = DEFAULT_SCHEME.flux, time = DEFAULT_SCHEME.time),
     )
     return SolutionState{T,Neq}(u, zero(T), ops.p, mesh, ops, sch, nothing)
 end
@@ -42,9 +42,9 @@ function allocate_state(
     mesh::Mesh1D{T},
     ops::FROperators{T},
     neq::Int;
-    scheme::Union{Nothing,SchemeConfig}=nothing,
+    scheme::Union{Nothing,SchemeConfig} = nothing,
 ) where {T}
-    return allocate_state(mesh, ops, Val(neq); scheme=scheme)
+    return allocate_state(mesh, ops, Val(neq); scheme = scheme)
 end
 
 """
@@ -77,7 +77,7 @@ function set_initial_condition!(state::SolutionState{T,Neq}, f) where {T,Neq}
 end
 
 """Discrete mass (integral) of component `c` using GL quadrature."""
-function discrete_mass(state::SolutionState{T}, c::Int=1) where {T}
+function discrete_mass(state::SolutionState{T}, c::Int = 1) where {T}
     mesh, ops = state.mesh, state.ops
     Np, Nel = size(state.u, 1), size(state.u, 2)
     m = zero(T)
@@ -90,7 +90,7 @@ function discrete_mass(state::SolutionState{T}, c::Int=1) where {T}
 end
 
 """L2 norm of error vs exact function `uexact(x)` for component `c` (scalar exact)."""
-function l2_error(state::SolutionState{T}, uexact, c::Int=1) where {T}
+function l2_error(state::SolutionState{T}, uexact, c::Int = 1) where {T}
     mesh, ops = state.mesh, state.ops
     Np, Nel = size(state.u, 1), size(state.u, 2)
     acc = zero(T)

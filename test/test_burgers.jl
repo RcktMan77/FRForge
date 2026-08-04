@@ -4,7 +4,7 @@ using FRForge
 @testset "Burgers residual finite" begin
     p = 3
     ops = build_operators(p)
-    mesh = Mesh1D(0.0, 1.0, 16; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    mesh = Mesh1D(0.0, 1.0, 16; left_bc = PeriodicBC(), right_bc = PeriodicBC())
     state = allocate_state(mesh, ops, Val(1))
     set_initial_condition!(state, x -> burgers_square_ic(x))
     eq = Burgers1D()
@@ -26,7 +26,7 @@ end
 
 @testset "burgers conservation p=2,3,4" begin
     for p in (2, 3, 4)
-        c = run_burgers_conservation(; p=p, n_elements=32, t_final=0.15, cfl=0.2)
+        c = run_burgers_conservation(; p = p, n_elements = 32, t_final = 0.15, cfl = 0.2)
         @test c["pass"]
         @test c["conservation_pass"]
         @test c["conservation_residual"] < 1e-10
@@ -36,7 +36,7 @@ end
 
 @testset "burgers HO oscillations p=2,3,4" begin
     for p in (2, 3, 4)
-        c = run_burgers_oscillation(; p=p, n_elements=32, t_final=0.15, cfl=0.2)
+        c = run_burgers_oscillation(; p = p, n_elements = 32, t_final = 0.15, cfl = 0.2)
         @test !c["diverged"]
         @test c["conservation_pass"]
         @test c["metrics"]["oscillations_present"]
@@ -45,4 +45,3 @@ end
         @info "p=$p overshoot=$(c["overshoot"]) u∈[$(c["metrics"]["u_min"]), $(c["metrics"]["u_max"])]"
     end
 end
-

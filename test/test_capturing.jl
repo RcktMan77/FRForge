@@ -55,7 +55,7 @@ end
     @test probe.n_dissip == 1
 
     probe2 = HookProbeMethod()
-    ssp_rk3!(state, eq, probe2, 0.05; cfl=0.2)
+    ssp_rk3!(state, eq, probe2, 0.05; cfl = 0.2)
     @test probe2.n_sense >= 3  # at least one full step × 3 stages
     @test probe2.n_post >= 1
 end
@@ -91,7 +91,7 @@ end
 
 @testset "PerssonAV reduces Burgers overshoot vs null" begin
     for p in (2, 3, 4)
-        _, c_pers, c_cmp = run_persson_vs_null_burgers(; p=p, n_elements=32, t_final=0.15)
+        _, c_pers, c_cmp = run_persson_vs_null_burgers(; p = p, n_elements = 32, t_final = 0.15)
         @test c_pers["pass"] || c_pers["conservation_pass"]  # at least stable+cons
         @test c_pers["conservation_pass"]
         @test !c_pers["diverged"]

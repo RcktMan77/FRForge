@@ -18,8 +18,7 @@ const PROMISING_OR_HIGHER = Set([
     "publication_grade",
 ])
 
-const NARRATIVE_PLACEHOLDER =
-    "[TODO: fill before shortlist/promotion — required for promising or higher]"
+const NARRATIVE_PLACEHOLDER = "[TODO: fill before shortlist/promotion — required for promising or higher]"
 
 """
     package_root() -> String
@@ -56,8 +55,8 @@ Build a unique-ish entry id: `YYYYMMDD-method-suffix`.
 """
 function make_entry_id(
     method_name::AbstractString;
-    date::Date=Dates.today(),
-    suffix::AbstractString="invent",
+    date::Date = Dates.today(),
+    suffix::AbstractString = "invent",
 )
     safe = replace(String(method_name), r"[^A-Za-z0-9_]+" => "_")
     return string(Dates.format(date, dateformat"yyyymmdd"), "-", safe, "-", suffix)
@@ -84,19 +83,20 @@ function entry_from_invent(
     method_report::AbstractDict,
     baseline_report::AbstractDict,
     cmp::AbstractDict;
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
-    strengths::AbstractString="",
-    weaknesses::AbstractString="",
-    scheme=FROZEN_INVENT_SCHEME,
-    git_ref::AbstractString="",
-    artifacts::Union{Nothing,AbstractDict}=nothing,
-    status::AbstractString="open",
-    entry_id::Union{Nothing,AbstractString}=nothing,
-    date::Date=Dates.today(),
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
+    strengths::AbstractString = "",
+    weaknesses::AbstractString = "",
+    scheme = FROZEN_INVENT_SCHEME,
+    git_ref::AbstractString = "",
+    artifacts::Union{Nothing,AbstractDict} = nothing,
+    status::AbstractString = "open",
+    entry_id::Union{Nothing,AbstractString} = nothing,
+    date::Date = Dates.today(),
 )
     cand = String(get(cmp, "candidate_status", "unknown"))
-    scores = get(cmp, "absolute_scores", get(get(method_report, "summary", Dict()), "scores", Dict()))
+    scores =
+        get(cmp, "absolute_scores", get(get(method_report, "summary", Dict()), "scores", Dict()))
     hyp = String(hypothesis)
     les = String(lessons)
     if narrative_required(cand)
@@ -128,10 +128,15 @@ function entry_from_invent(
     end
 
     return Dict{String,Any}(
-        "id" => something(entry_id, make_entry_id(method_name; date=date)),
+        "id" => something(entry_id, make_entry_id(method_name; date = date)),
         "date" => string(date),
         "method" => String(method_name),
-        "baseline" => string(something(get(cmp, "baseline_name", nothing), get(method_report, "baseline_name", "persson_av"))),
+        "baseline" => string(
+            something(
+                get(cmp, "baseline_name", nothing),
+                get(method_report, "baseline_name", "persson_av"),
+            ),
+        ),
         "hypothesis" => hyp,
         "scheme" => sch,
         "metrics" => Dict{String,Any}(
@@ -214,7 +219,7 @@ function format_entry_markdown(entry::AbstractDict)
     arts = get(entry, "artifacts", Dict())
     if arts isa AbstractDict && !isempty(arts)
         println(io, "- **artifacts:**")
-        for (k, v) in sort(collect(pairs(arts)); by=x -> string(x[1]))
+        for (k, v) in sort(collect(pairs(arts)); by = x -> string(x[1]))
             println(io, "  - ", k, ": ", v)
         end
     else
@@ -244,7 +249,7 @@ Returns the entry dict.
 function append_experiment_entry!(
     path::AbstractString,
     entry::AbstractDict;
-    yaml_path::Union{Nothing,AbstractString}=nothing,
+    yaml_path::Union{Nothing,AbstractString} = nothing,
 )
     mkpath(dirname(path))
     block = format_entry_markdown(entry)
@@ -283,7 +288,7 @@ function _append_yaml_index_stub!(yaml_path::AbstractString, entry::AbstractDict
         arts = get(entry, "artifacts", Dict())
         if arts isa AbstractDict && !isempty(arts)
             println(io, "    artifacts:")
-            for (k, v) in sort(collect(pairs(arts)); by=x -> string(x[1]))
+            for (k, v) in sort(collect(pairs(arts)); by = x -> string(x[1]))
                 println(io, "      ", k, ": ", v)
             end
         end
@@ -319,38 +324,38 @@ function invent_append_log!(
     method_report::AbstractDict,
     baseline_report::AbstractDict,
     cmp::AbstractDict;
-    log_path::AbstractString=default_experiment_log_path(),
-    yaml_path::Union{Nothing,AbstractString}=default_experiment_log_yaml_path(),
-    artifacts::Union{Nothing,AbstractDict}=nothing,
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
-    strengths::AbstractString="",
-    weaknesses::AbstractString="",
-    git_ref::AbstractString="",
-    status::AbstractString="open",
+    log_path::AbstractString = default_experiment_log_path(),
+    yaml_path::Union{Nothing,AbstractString} = default_experiment_log_yaml_path(),
+    artifacts::Union{Nothing,AbstractDict} = nothing,
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
+    strengths::AbstractString = "",
+    weaknesses::AbstractString = "",
+    git_ref::AbstractString = "",
+    status::AbstractString = "open",
 )
     entry = entry_from_invent(
         method_name,
         method_report,
         baseline_report,
         cmp;
-        hypothesis=hypothesis,
-        lessons=lessons,
-        strengths=strengths,
-        weaknesses=weaknesses,
-        artifacts=artifacts,
-        git_ref=git_ref,
-        status=status,
+        hypothesis = hypothesis,
+        lessons = lessons,
+        strengths = strengths,
+        weaknesses = weaknesses,
+        artifacts = artifacts,
+        git_ref = git_ref,
+        status = status,
     )
-    append_experiment_entry!(entry; path=log_path, yaml_path=yaml_path)
+    append_experiment_entry!(entry; path = log_path, yaml_path = yaml_path)
     return entry
 end
 
 # Convenience: keyword order matching common call style
 function append_experiment_entry!(
     entry::AbstractDict;
-    path::AbstractString=default_experiment_log_path(),
-    yaml_path::Union{Nothing,AbstractString}=nothing,
+    path::AbstractString = default_experiment_log_path(),
+    yaml_path::Union{Nothing,AbstractString} = nothing,
 )
-    return append_experiment_entry!(path, entry; yaml_path=yaml_path)
+    return append_experiment_entry!(path, entry; yaml_path = yaml_path)
 end

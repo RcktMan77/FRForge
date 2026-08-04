@@ -104,13 +104,13 @@ end
 
 Evaluate g_L, g_R at ξ=±1 for unit tests.
 """
-function g_DG_endpoints(p::Int; T::Type=Float64)
+function g_DG_endpoints(p::Int; T::Type = Float64)
     ξ = T[-one(T), one(T)]
     gL, gR, _, _ = g_DG_values_and_derivs(p, ξ)
     return (
-        gL_m1=gL[1],
-        gL_p1=gL[2],
-        gR_m1=gR[1],
-        gR_p1=gR[2],
+        gL_m1 = gL[1],
+        gL_p1 = gL[2],
+        gR_m1 = gR[1],
+        gR_p1 = gR[2],
     )
 end

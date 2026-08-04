@@ -5,6 +5,10 @@
                        diverged, nan_detected, kwargs...) -> Dict{String,Any}
 
 Build a case report with the standard required keys, plus optional extra fields.
+
+Optional scoring fields (`excess_dissipation`, `shock_thickness`, `overshoot`, …)
+are omitted when left as `nothing` so JSON shape matches hand-built cases.
+Additional top-level keys can be passed via `extra`.
 """
 function case_report_dict(;
     name::AbstractString,
@@ -24,8 +28,8 @@ function case_report_dict(;
     t_final=nothing,
     excess_dissipation=nothing,
     shock_thickness=nothing,
-    shock_thickness_unit::AbstractString="sp_spacings",
-    overshoot=0.0,
+    shock_thickness_unit::Union{Nothing,AbstractString}=nothing,
+    overshoot=nothing,
     metrics::Union{Nothing,AbstractDict}=nothing,
     extra::AbstractDict=Dict{String,Any}(),
 )
@@ -43,13 +47,13 @@ function case_report_dict(;
         "conservation_metric" => String(conservation_metric),
         "positivity_ok" => positivity_ok,
         "wall_time_sec" => Float64(wall_time_sec),
-        "excess_dissipation" => excess_dissipation,
-        "shock_thickness" => shock_thickness,
-        "shock_thickness_unit" => String(shock_thickness_unit),
-        "overshoot" => overshoot,
     )
     n_elements !== nothing && (d["n_elements"] = Int(n_elements))
     t_final !== nothing && (d["t_final"] = t_final)
+    excess_dissipation !== nothing && (d["excess_dissipation"] = excess_dissipation)
+    shock_thickness !== nothing && (d["shock_thickness"] = shock_thickness)
+    shock_thickness_unit !== nothing && (d["shock_thickness_unit"] = String(shock_thickness_unit))
+    overshoot !== nothing && (d["overshoot"] = overshoot)
     metrics !== nothing && (d["metrics"] = Dict{String,Any}(metrics))
     for (k, v) in pairs(extra)
         d[String(k)] = v

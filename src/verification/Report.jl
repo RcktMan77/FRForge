@@ -25,7 +25,7 @@ Best-effort short git SHA of the working tree, or `"unknown"`.
 function git_commit_short()
     try
         root = joinpath(@__DIR__, "..", "..")
-        sha = read(Cmd(`git -C $root rev-parse --short HEAD`; ignorestatus=true), String)
+        sha = read(Cmd(`git -C $root rev-parse --short HEAD`; ignorestatus = true), String)
         sha = strip(sha)
         return isempty(sha) ? "unknown" : sha
     catch
@@ -85,7 +85,8 @@ function report_skeleton(;
         "package" => "FRForge",
         "package_version" => package_version(),
         "git_commit" => git_commit_short(),
-        "timestamp_utc" => Dates.format(Dates.now(Dates.UTC), dateformat"yyyy-mm-ddTHH:MM:SS") * "Z",
+        "timestamp_utc" =>
+            Dates.format(Dates.now(Dates.UTC), dateformat"yyyy-mm-ddTHH:MM:SS") * "Z",
         "julia_version" => string(VERSION),
         "command" => String(command),
         "suite" => String(suite),

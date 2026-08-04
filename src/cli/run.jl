@@ -8,7 +8,7 @@
 # ---------------------------------------------------------------------------
 
 function _cli_mesh1d_periodic(xL::Real, xR::Real, Ne::Int)
-    return Mesh1D(Float64(xL), Float64(xR), Ne; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+    return Mesh1D(Float64(xL), Float64(xR), Ne; left_bc = PeriodicBC(), right_bc = PeriodicBC())
 end
 
 function _cli_mesh1d_transmissive(xL::Real, xR::Real, Ne::Int)
@@ -16,12 +16,12 @@ function _cli_mesh1d_transmissive(xL::Real, xR::Real, Ne::Int)
         Float64(xL),
         Float64(xR),
         Ne;
-        left_bc=TransmissiveBC(),
-        right_bc=TransmissiveBC(),
+        left_bc = TransmissiveBC(),
+        right_bc = TransmissiveBC(),
     )
 end
 
-function _cli_mesh2d_unit(Ne::Int; transmissive::Bool=false)
+function _cli_mesh2d_unit(Ne::Int; transmissive::Bool = false)
     if transmissive
         return Mesh2D(
             0.0,
@@ -30,10 +30,10 @@ function _cli_mesh2d_unit(Ne::Int; transmissive::Bool=false)
             1.0,
             Ne,
             Ne;
-            left_bc=TransmissiveBC(),
-            right_bc=TransmissiveBC(),
-            bottom_bc=TransmissiveBC(),
-            top_bc=TransmissiveBC(),
+            left_bc = TransmissiveBC(),
+            right_bc = TransmissiveBC(),
+            bottom_bc = TransmissiveBC(),
+            top_bc = TransmissiveBC(),
         )
     end
     return Mesh2D(0.0, 1.0, 0.0, 1.0, Ne, Ne)
@@ -45,19 +45,19 @@ function _cli_t_final(opts::AbstractDict, case_default::Float64)
 end
 
 function _cli_state1d(mesh, ops, scheme, ::Val{Neq}, u0) where {Neq}
-    state = allocate_state(mesh, ops, Val(Neq); scheme=scheme)
+    state = allocate_state(mesh, ops, Val(Neq); scheme = scheme)
     set_initial_condition!(state, u0)
     return state
 end
 
 function _cli_state2d(mesh, ops, scheme, ::Val{Neq}, u0) where {Neq}
-    state = allocate_state(mesh, ops, Val(Neq); scheme=scheme)
+    state = allocate_state(mesh, ops, Val(Neq); scheme = scheme)
     set_initial_condition!(state, u0)
     return state
 end
 
 """Optionally write high-order VTU if --output is set."""
-function _maybe_write_vtu(opts, state, eq, method=nothing)
+function _maybe_write_vtu(opts, state, eq, method = nothing)
     out = opts["output"]
     if !isempty(out)
         if get(opts, "vtk_diagnostics", false) &&
@@ -87,7 +87,7 @@ function _run_case_advection_sine(opts, ops, scheme, method)
     mesh = _cli_mesh1d_periodic(0.0, 1.0, Ne)
     state = _cli_state1d(mesh, ops, scheme, Val(1), x -> sin(2π * x))
     M0 = discrete_mass(state, 1)
-    result = integrate!(state, eq, method, t_final; cfl=cfl)
+    result = integrate!(state, eq, method, t_final; cfl = cfl)
     MT = discrete_mass(state, 1)
     err = l2_error(state, x -> sin(2π * (x - a * t_final)), 1)
     println(
@@ -106,7 +106,7 @@ function _run_case_burgers_square(opts, ops, scheme, method)
     state = _cli_state1d(mesh, ops, scheme, Val(1), x -> burgers_square_ic(x))
     u0_min, u0_max = solution_extrema(state, 1)
     M0 = discrete_mass(state, 1)
-    result = integrate!(state, eq, method, t_final; cfl=cfl)
+    result = integrate!(state, eq, method, t_final; cfl = cfl)
     MT = discrete_mass(state, 1)
     u_min, u_max = solution_extrema(state, 1)
     _, _, η = overshoot_metric(u_min, u_max, u0_min, u0_max)
@@ -128,7 +128,7 @@ function _run_case_euler_density_wave(opts, ops, scheme, method)
     mesh = _cli_mesh1d_periodic(0.0, 1.0, Ne)
     state = _cli_state1d(mesh, ops, scheme, Val(3), x -> euler_density_wave_conserved(eq, x, 0.0))
     M0 = discrete_mass(state, 1)
-    result = integrate!(state, eq, method, t_final; cfl=cfl)
+    result = integrate!(state, eq, method, t_final; cfl = cfl)
     MT = discrete_mass(state, 1)
     err = l2_error(state, x -> euler_density_wave_conserved(eq, x, t_final), 1)
     println(
@@ -147,14 +147,14 @@ function _run_case_sod(opts, ops, scheme, method)
     eq = Euler1D(1.4)
     mesh = _cli_mesh1d_transmissive(0.0, 1.0, Ne)
     state = _cli_state1d(mesh, ops, scheme, Val(3), x -> sod_ic(eq, x))
-    result = integrate!(state, eq, method, tf; cfl=min(cfl, 0.15))
+    result = integrate!(state, eq, method, tf; cfl = min(cfl, 0.15))
     c = run_sod(;
-        p=p,
-        n_elements=Ne,
-        t_final=tf,
-        cfl=cfl,
-        method=method,
-        method_name=opts["method"],
+        p = p,
+        n_elements = Ne,
+        t_final = tf,
+        cfl = cfl,
+        method = method,
+        method_name = opts["method"],
     )
     println(
         "case=sod p=$p ne=$Ne t_final=$tf method=$(opts["method"]) scheme=$(scheme_dict(scheme))",
@@ -175,14 +175,14 @@ function _run_case_shu_osher(opts, ops, scheme, method)
     eq = Euler1D(1.4)
     mesh = _cli_mesh1d_transmissive(0.0, 10.0, Ne)
     state = _cli_state1d(mesh, ops, scheme, Val(3), x -> shu_osher_ic(eq, x))
-    result = integrate!(state, eq, method, tf; cfl=cfl)
+    result = integrate!(state, eq, method, tf; cfl = cfl)
     c = run_shu_osher(;
-        p=p,
-        n_elements=Ne,
-        t_final=tf,
-        cfl=cfl,
-        method=method,
-        method_name=opts["method"],
+        p = p,
+        n_elements = Ne,
+        t_final = tf,
+        cfl = cfl,
+        method = method,
+        method_name = opts["method"],
     )
     println(
         "case=shu_osher p=$p ne=$Ne t_final=$tf method=$(opts["method"]) scheme=$(scheme_dict(scheme))",
@@ -203,7 +203,7 @@ function _run_case_advection2d(opts, ops, scheme, method)
     eq = LinearAdvection2D(ax, ay)
     mesh = _cli_mesh2d_unit(Ne)
     state = _cli_state2d(mesh, ops, scheme, Val(1), (x, y) -> sin(2π * x) * sin(2π * y))
-    result = integrate!(state, eq, method, t_final; cfl=cfl)
+    result = integrate!(state, eq, method, t_final; cfl = cfl)
     err = l2_error(
         state,
         (x, y) -> sin(2π * (x - ax * t_final)) * sin(2π * (y - ay * t_final)),
@@ -234,7 +234,7 @@ function _run_case_euler2d_wave(opts, ops, scheme, method)
                 1.0,
             ),
     )
-    result = integrate!(state, eq, method, t_final; cfl=min(cfl, 0.15))
+    result = integrate!(state, eq, method, t_final; cfl = min(cfl, 0.15))
     println(
         "case=euler2d_wave p=$p ne=$(Ne)x$(Ne) t_final=$t_final status=$(result.status) pos=$(positivity_ok(eq, state)) scheme=$(scheme_dict(scheme))",
     )
@@ -246,7 +246,7 @@ function _run_case_euler2d_jump(opts, ops, scheme, method)
     p, Ne, cfl = opts["p"], opts["ne"], opts["cfl"]
     tf = _cli_t_final(opts, 0.05)
     eq = Euler2D(1.4)
-    mesh = _cli_mesh2d_unit(Ne; transmissive=true)
+    mesh = _cli_mesh2d_unit(Ne; transmissive = true)
     state = _cli_state2d(
         mesh,
         ops,
@@ -256,7 +256,7 @@ function _run_case_euler2d_jump(opts, ops, scheme, method)
             x < 0.5 ? primitives_to_conserved(eq, 1.0, 0.0, 0.0, 1.0) :
             primitives_to_conserved(eq, 0.125, 0.0, 0.0, 0.1),
     )
-    result = integrate!(state, eq, method, tf; cfl=min(cfl, 0.1))
+    result = integrate!(state, eq, method, tf; cfl = min(cfl, 0.1))
     println(
         "case=euler2d_jump p=$p ne=$(Ne)x$(Ne) t_final=$tf status=$(result.status) pos=$(positivity_ok(eq, state)) scheme=$(scheme_dict(scheme))",
     )
@@ -270,14 +270,14 @@ function _run_case_riemann2d(opts, ops, scheme, method)
     tf = _cli_t_final(opts, 0.12)
     ny = opts["ny"] > 0 ? opts["ny"] : Ne
     c, state, eq = run_euler2d_riemann(;
-        p=p,
-        nx=Ne,
-        ny=ny,
-        t_final=tf,
-        cfl=min(cfl, 0.08),
-        config=:cfg6,
-        method=method,
-        method_name=opts["method"],
+        p = p,
+        nx = Ne,
+        ny = ny,
+        t_final = tf,
+        cfl = min(cfl, 0.08),
+        config = :cfg6,
+        method = method,
+        method_name = opts["method"],
     )
     println(
         "case=riemann2d cfg6 p=$p ne=$(Ne)x$(ny) t_final=$tf method=$(opts["method"]) pass=$(c["pass"]) pos=$(c["positivity_ok"])",
@@ -293,17 +293,17 @@ function _run_case_double_mach(opts, ops, scheme, method)
     tf = _cli_t_final(opts, 0.08)
     ny = opts["ny"] > 0 ? opts["ny"] : max(div(Ne, 3), 4)
     c, state, eq = run_double_mach_reflection(;
-        p=p,
-        nx=Ne,
-        ny=ny,
-        t_final=tf,
-        cfl=min(cfl, 0.05),
-        Lx=1.5,
-        Ly=0.5,
-        strength=:reduced,
-        method=method,
-        method_name=opts["method"],
-        require_positivity=false,
+        p = p,
+        nx = Ne,
+        ny = ny,
+        t_final = tf,
+        cfl = min(cfl, 0.05),
+        Lx = 1.5,
+        Ly = 0.5,
+        strength = :reduced,
+        method = method,
+        method_name = opts["method"],
+        require_positivity = false,
     )
     println(
         "case=double_mach reduced p=$p ne=$(Ne)x$(ny) t_final=$tf method=$(opts["method"]) pass=$(c["pass"]) pos=$(c["positivity_ok"])",
@@ -320,8 +320,8 @@ end
 
 function _parse_run_args(args)
     s = ArgParseSettings(
-        description="Run a single FRForge case.",
-        prog="frforge run",
+        description = "Run a single FRForge case.",
+        prog = "frforge run",
     )
     @add_arg_table! s begin
         "--case"
@@ -400,6 +400,6 @@ function cli_run(args)
     end
     method = get_capturing_method(opts["method"])
     scheme = _scheme_from_opts(opts)
-    ops = build_operators(opts["p"]; points=scheme.points)
+    ops = build_operators(opts["p"]; points = scheme.points)
     return runner(opts, ops, scheme, method)
 end

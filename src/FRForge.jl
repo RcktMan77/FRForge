@@ -154,7 +154,8 @@ export AbstractShockSensor, AbstractDissipationOperator
 export NullSensor, NullDissipation
 export PerssonSensor, ElementArtificialViscosity, PerssonAVMethod
 export default_persson_params, method_params
-export get_capturing_method, register_method!, require_registered_method, list_methods, describe_methods
+export get_capturing_method,
+    register_method!, require_registered_method, list_methods, describe_methods
 export sense!, apply_dissipation!, preprocess_state!, extrapolate_interface!
 export numerical_flux_method, post_step!
 export ScaledPerssonMethod

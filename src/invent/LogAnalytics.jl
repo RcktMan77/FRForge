@@ -32,7 +32,7 @@ const NEAR_MISS_COMPOSITE_MARGIN = 0.02
 Parse Markdown experiment log into normalized entry dicts.
 Tolerant of missing optional fields, `~0.919` numerics, and platform entries.
 """
-function parse_experiment_log(path::AbstractString=default_experiment_log_path())
+function parse_experiment_log(path::AbstractString = default_experiment_log_path())
     isfile(path) || return Dict{String,Any}[]
     text = read(path, String)
     return parse_experiment_log_text(text)
@@ -236,14 +236,21 @@ function log_summary(entries::AbstractVector)
     for e in entries
         st = String(get(e, "status", "unknown"))
         by_status[st] = get(by_status, st, 0) + 1
-        cs = string(get(e, "candidate_status", get(get(e, "metrics", Dict()), "candidate_status", "unknown")))
+        cs = string(
+            get(
+                e,
+                "candidate_status",
+                get(get(e, "metrics", Dict()), "candidate_status", "unknown"),
+            ),
+        )
         by_cand[cs] = get(by_cand, cs, 0) + 1
 
         meth = String(get(e, "method", ""))
         kind = String(get(e, "kind", "method"))
         if kind != "platform" && !isempty(meth) && meth != "n/a"
             # keep latest by date string then id
-            if !haskey(latest, meth) || string(e["date"], e["id"]) > string(latest[meth]["date"], latest[meth]["id"])
+            if !haskey(latest, meth) ||
+               string(e["date"], e["id"]) > string(latest[meth]["date"], latest[meth]["id"])
                 latest[meth] = e
             end
         end
@@ -257,7 +264,8 @@ function log_summary(entries::AbstractVector)
                 Dict{String,Any}(
                     "id" => e["id"],
                     "method" => meth,
-                    "hypothesis_todo" => occursin("TODO", hyp) || occursin(NARRATIVE_PLACEHOLDER, hyp),
+                    "hypothesis_todo" =>
+                        occursin("TODO", hyp) || occursin(NARRATIVE_PLACEHOLDER, hyp),
                     "lessons_todo" => occursin("TODO", les) || occursin(NARRATIVE_PLACEHOLDER, les),
                 ),
             )
@@ -304,7 +312,7 @@ Core frontier (baseline + promising-class + shortlisted) plus near-miss pass_gat
 """
 function log_frontier(
     entries::AbstractVector;
-    near_margin::Real=NEAR_MISS_COMPOSITE_MARGIN,
+    near_margin::Real = NEAR_MISS_COMPOSITE_MARGIN,
 )
     # latest invent-like entry per method
     latest = Dict{String,Dict{String,Any}}()
@@ -313,7 +321,8 @@ function log_frontier(
         kind == "platform" && continue
         meth = String(get(e, "method", ""))
         (isempty(meth) || meth == "n/a") && continue
-        if !haskey(latest, meth) || string(e["date"], e["id"]) > string(latest[meth]["date"], latest[meth]["id"])
+        if !haskey(latest, meth) ||
+           string(e["date"], e["id"]) > string(latest[meth]["date"], latest[meth]["id"])
             latest[meth] = e
         end
     end
@@ -321,7 +330,9 @@ function log_frontier(
     # baseline composite reference
     base_comp = nothing
     for e in values(latest)
-        cs = string(get(e, "candidate_status", get(get(e, "metrics", Dict()), "candidate_status", "")))
+        cs = string(
+            get(e, "candidate_status", get(get(e, "metrics", Dict()), "candidate_status", "")),
+        )
         if cs == "baseline" || String(get(e, "status", "")) == "baseline"
             c = get(get(e, "metrics", Dict()), "composite", nothing)
             c isa Number && (base_comp = Float64(c))
@@ -376,7 +387,14 @@ function log_frontier(
             ),
         )
     end
-    sort!(rows; by=r -> (-(r["near"] ? 0 : 1), -(r["composite"] isa Number ? Float64(r["composite"]) : -Inf), string(r["method"])))
+    sort!(
+        rows;
+        by = r -> (
+            -(r["near"] ? 0 : 1),
+            -(r["composite"] isa Number ? Float64(r["composite"]) : -Inf),
+            string(r["method"]),
+        ),
+    )
     return rows
 end
 
@@ -393,9 +411,12 @@ function log_pareto(entries::AbstractVector)
         meth = String(get(e, "method", ""))
         isempty(meth) && continue
         met = get(e, "metrics", Dict())
-        o, d, s = get(met, "order_preservation", nothing), get(met, "dissipation", nothing), get(met, "shock_quality", nothing)
+        o, d, s = get(met, "order_preservation", nothing),
+        get(met, "dissipation", nothing),
+        get(met, "shock_quality", nothing)
         (o isa Number && d isa Number && s isa Number) || continue
-        if !haskey(latest, meth) || string(e["date"], e["id"]) > string(latest[meth]["date"], latest[meth]["id"])
+        if !haskey(latest, meth) ||
+           string(e["date"], e["id"]) > string(latest[meth]["date"], latest[meth]["id"])
             latest[meth] = e
         end
     end
@@ -436,7 +457,10 @@ function log_pareto(entries::AbstractVector)
         end
         ri["pareto"] = !dominated
     end
-    sort!(rows; by=r -> (-(r["composite"] isa Number ? Float64(r["composite"]) : -Inf), r["method"]))
+    sort!(
+        rows;
+        by = r -> (-(r["composite"] isa Number ? Float64(r["composite"]) : -Inf), r["method"]),
+    )
     return rows
 end
 
@@ -445,11 +469,12 @@ end
 
 Flatten lessons and weaknesses; optional case-insensitive substring filter.
 """
-function log_lessons(entries::AbstractVector; query::Union{Nothing,AbstractString}=nothing)
+function log_lessons(entries::AbstractVector; query::Union{Nothing,AbstractString} = nothing)
     out = Dict{String,Any}[]
     q = query === nothing ? nothing : lowercase(String(query))
     for e in entries
-        for (field, text) in (("lessons", get(e, "lessons", "")), ("weaknesses", get(e, "weaknesses", "")))
+        for (field, text) in
+            (("lessons", get(e, "lessons", "")), ("weaknesses", get(e, "weaknesses", "")))
             t = strip(String(text))
             isempty(t) && continue
             if q !== nothing && !occursin(q, lowercase(t))
@@ -477,15 +502,15 @@ function format_log_summary_text(summary::AbstractDict)
     io = IOBuffer()
     println(io, "Experiment log summary  (n_entries=$(summary["n_entries"]))")
     println(io, "By status:")
-    for (k, v) in sort(collect(pairs(summary["by_status"])); by=x -> x[1])
+    for (k, v) in sort(collect(pairs(summary["by_status"])); by = x -> x[1])
         println(io, "  ", k, ": ", v)
     end
     println(io, "By candidate_status:")
-    for (k, v) in sort(collect(pairs(summary["by_candidate_status"])); by=x -> x[1])
+    for (k, v) in sort(collect(pairs(summary["by_candidate_status"])); by = x -> x[1])
         println(io, "  ", k, ": ", v)
     end
     println(io, "Latest per method:")
-    for (m, info) in sort(collect(pairs(summary["latest_by_method"])); by=x -> x[1])
+    for (m, info) in sort(collect(pairs(summary["latest_by_method"])); by = x -> x[1])
         println(
             io,
             "  ",
@@ -590,23 +615,42 @@ end
 function format_log_entry_text(entry::AbstractDict)
     io = IOBuffer()
     println(io, "### ", entry["id"])
-    for k in ("date", "method", "baseline", "status", "candidate_status", "hypothesis", "lessons", "strengths", "weaknesses", "git_ref")
+    for k in (
+        "date",
+        "method",
+        "baseline",
+        "status",
+        "candidate_status",
+        "hypothesis",
+        "lessons",
+        "strengths",
+        "weaknesses",
+        "git_ref",
+    )
         haskey(entry, k) && !isempty(string(get(entry, k, ""))) &&
             println(io, k, ": ", entry[k])
     end
     sch = get(entry, "scheme", Dict())
-    println(io, "scheme: points=", get(sch, "points", "?"), " flux=", get(sch, "flux", "?"), " time=", get(sch, "time", "?"))
+    println(
+        io,
+        "scheme: points=",
+        get(sch, "points", "?"),
+        " flux=",
+        get(sch, "flux", "?"),
+        " time=",
+        get(sch, "time", "?"),
+    )
     met = get(entry, "metrics", Dict())
     if !isempty(met)
         println(io, "metrics:")
-        for (k, v) in sort(collect(pairs(met)); by=x -> string(x[1]))
+        for (k, v) in sort(collect(pairs(met)); by = x -> string(x[1]))
             println(io, "  ", k, ": ", v)
         end
     end
     arts = get(entry, "artifacts", Dict())
     if arts isa AbstractDict && !isempty(arts)
         println(io, "artifacts:")
-        for (k, v) in sort(collect(pairs(arts)); by=x -> string(x[1]))
+        for (k, v) in sort(collect(pairs(arts)); by = x -> string(x[1]))
             println(io, "  ", k, ": ", v)
         end
     end

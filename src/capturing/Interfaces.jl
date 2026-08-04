@@ -31,7 +31,7 @@ struct InterfaceTraces{T}
     uR::Matrix{T}
 end
 
-function allocate_traces(Nel::Int, Neq::Int, ::Type{T}=Float64) where {T}
+function allocate_traces(Nel::Int, Neq::Int, ::Type{T} = Float64) where {T}
     return InterfaceTraces{T}(zeros(T, Nel, Neq), zeros(T, Nel, Neq))
 end
 
@@ -128,6 +128,8 @@ end
 function get_capturing_method(name::AbstractString; kwargs...)
     key = String(name)
     haskey(METHOD_REGISTRY, key) ||
-        error("Unknown capturing method \"$key\". Known: $(join(sort(collect(keys(METHOD_REGISTRY))), ", "))")
+        error(
+            "Unknown capturing method \"$key\". Known: $(join(sort(collect(keys(METHOD_REGISTRY))), ", "))",
+        )
     return METHOD_REGISTRY[key](; kwargs...)
 end

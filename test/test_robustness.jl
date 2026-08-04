@@ -14,8 +14,8 @@ using Dates
 end
 
 @testset "assess_publication_grade rules" begin
-    function fake_cell(; points, flux, time, ok, cand="pass_gates")
-        sch = SchemeConfig(; points=points, flux=flux, time=time)
+    function fake_cell(; points, flux, time, ok, cand = "pass_gates")
+        sch = SchemeConfig(; points = points, flux = flux, time = time)
         return Dict{String,Any}(
             "scheme" => scheme_dict(sch),
             "scheme_slug" => scheme_slug(sch),
@@ -26,37 +26,43 @@ end
     end
     # All ok + promising default + narrative
     cells = [
-        fake_cell(; points=:gl, flux=:rusanov, time=:ssp_rk3, ok=true, cand="promising"),
-        fake_cell(; points=:gll, flux=:hllc, time=:ssp_rk3, ok=true, cand="pass_gates"),
-        fake_cell(; points=:gl, flux=:hllc, time=:ssp_rk2, ok=true, cand="pass_gates"),
-        fake_cell(; points=:gll, flux=:rusanov, time=:ssp_rk3, ok=true, cand="pass_gates"),
+        fake_cell(; points = :gl, flux = :rusanov, time = :ssp_rk3, ok = true, cand = "promising"),
+        fake_cell(; points = :gll, flux = :hllc, time = :ssp_rk3, ok = true, cand = "pass_gates"),
+        fake_cell(; points = :gl, flux = :hllc, time = :ssp_rk2, ok = true, cand = "pass_gates"),
+        fake_cell(;
+            points = :gll,
+            flux = :rusanov,
+            time = :ssp_rk3,
+            ok = true,
+            cand = "pass_gates",
+        ),
     ]
-    a = assess_publication_grade(cells; narrative_complete=true, confirm_passed=true)
+    a = assess_publication_grade(cells; narrative_complete = true, confirm_passed = true)
     @test a["eligible"] == true
     @test a["recommended_status"] == "publication_grade"
 
     # Missing fine-mesh confirm
-    a0 = assess_publication_grade(cells; narrative_complete=true, confirm_passed=false)
+    a0 = assess_publication_grade(cells; narrative_complete = true, confirm_passed = false)
     @test a0["eligible"] == false
     @test any(r -> r["id"] == "fine_mesh_confirm" && r["ok"] == false, a0["rules"])
 
     # HLLC failure
     cells_bad = copy(cells)
-    cells_bad[2] = fake_cell(; points=:gll, flux=:hllc, time=:ssp_rk3, ok=false)
-    a2 = assess_publication_grade(cells_bad; narrative_complete=true, confirm_passed=true)
+    cells_bad[2] = fake_cell(; points = :gll, flux = :hllc, time = :ssp_rk3, ok = false)
+    a2 = assess_publication_grade(cells_bad; narrative_complete = true, confirm_passed = true)
     @test a2["eligible"] == false
     @test any(r -> r["id"] == "hllc_robust" && r["ok"] == false, a2["rules"])
 
     # Default not promising
     cells3 = [
-        fake_cell(; points=:gl, flux=:rusanov, time=:ssp_rk3, ok=true, cand="pass_gates"),
-        fake_cell(; points=:gll, flux=:hllc, time=:ssp_rk3, ok=true),
+        fake_cell(; points = :gl, flux = :rusanov, time = :ssp_rk3, ok = true, cand = "pass_gates"),
+        fake_cell(; points = :gll, flux = :hllc, time = :ssp_rk3, ok = true),
     ]
-    a3 = assess_publication_grade(cells3; narrative_complete=true, confirm_passed=true)
+    a3 = assess_publication_grade(cells3; narrative_complete = true, confirm_passed = true)
     @test a3["eligible"] == false
 
     # Narrative incomplete
-    a4 = assess_publication_grade(cells; narrative_complete=false, confirm_passed=true)
+    a4 = assess_publication_grade(cells; narrative_complete = false, confirm_passed = true)
     @test a4["eligible"] == false
 end
 
@@ -83,7 +89,7 @@ end
 @testset "robustness light cell smoke (CI-tier)" begin
     # Single light cell under DEFAULT_SCHEME — keeps required CI budget.
     # Compare persson_av vs itself so classification is well-defined.
-    cell = evaluate_robustness_cell("persson_av", "persson_av", DEFAULT_SCHEME; light=true)
+    cell = evaluate_robustness_cell("persson_av", "persson_av", DEFAULT_SCHEME; light = true)
     @test haskey(cell, "cell_status")
     @test haskey(cell, "scheme_slug")
     @test cell["scheme_slug"] == "gl_rusanov_ssp_rk3"
@@ -99,14 +105,14 @@ end
         # One-method matrix=ci is two light cells — acceptable for unit tests
         summary = run_robustness_matrix(
             "null";
-            baseline="null",
-            matrix=:ci,
-            report_dir=joinpath(dir, "rob"),
-            light=true,
-            append_log=true,
-            log_path=logp,
-            narrative_complete=false,
-            invent_status="pass_gates",
+            baseline = "null",
+            matrix = :ci,
+            report_dir = joinpath(dir, "rob"),
+            light = true,
+            append_log = true,
+            log_path = logp,
+            narrative_complete = false,
+            invent_status = "pass_gates",
         )
         @test summary["matrix"] == "ci"
         @test length(summary["cells"]) == 2

@@ -16,9 +16,9 @@ function ssp_rk2_step!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     Δt::T;
-    du=similar(state.u),
-    u0=similar(state.u),
-    u1=similar(state.u),
+    du = similar(state.u),
+    u0 = similar(state.u),
+    u1 = similar(state.u),
 ) where {T,Neq}
     copyto!(u0, state.u)
     t0 = state.t
@@ -44,9 +44,9 @@ function ssp_rk2_step!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     Δt::T;
-    du=similar(state.u),
-    u0=similar(state.u),
-    u1=similar(state.u),
+    du = similar(state.u),
+    u0 = similar(state.u),
+    u1 = similar(state.u),
 ) where {T,Neq}
     copyto!(u0, state.u)
     t0 = state.t
@@ -72,9 +72,9 @@ function ssp_rk2!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     t_final::Real;
-    cfl::Real=0.2,
-    dt::Union{Nothing,Real}=nothing,
-    max_steps::Int=10^7,
+    cfl::Real = 0.2,
+    dt::Union{Nothing,Real} = nothing,
+    max_steps::Int = 10^7,
 ) where {T,Neq}
     t_final_T = T(t_final)
     du = similar(state.u)
@@ -83,20 +83,20 @@ function ssp_rk2!(
     fixed_dt = dt === nothing ? nothing : T(dt)
     n_steps = 0
     while state.t < t_final_T - 10 * eps(T)
-        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl=cfl) : fixed_dt
+        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl = cfl) : fixed_dt
         if state.t + step_dt > t_final_T
             step_dt = t_final_T - state.t
         end
-        status = ssp_rk2_step!(state, eq, method, step_dt; du=du, u0=u0, u1=u1)
+        status = ssp_rk2_step!(state, eq, method, step_dt; du = du, u0 = u0, u1 = u1)
         n_steps += 1
         if status != :ok
-            return (status=status, n_steps=n_steps, t=state.t)
+            return (status = status, n_steps = n_steps, t = state.t)
         end
         if n_steps >= max_steps
-            return (status=:max_steps, n_steps=n_steps, t=state.t)
+            return (status = :max_steps, n_steps = n_steps, t = state.t)
         end
     end
-    return (status=:ok, n_steps=n_steps, t=state.t)
+    return (status = :ok, n_steps = n_steps, t = state.t)
 end
 
 function ssp_rk2!(
@@ -104,9 +104,9 @@ function ssp_rk2!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     t_final::Real;
-    cfl::Real=0.2,
-    dt::Union{Nothing,Real}=nothing,
-    max_steps::Int=10^7,
+    cfl::Real = 0.2,
+    dt::Union{Nothing,Real} = nothing,
+    max_steps::Int = 10^7,
 ) where {T,Neq}
     t_final_T = T(t_final)
     du = similar(state.u)
@@ -115,20 +115,20 @@ function ssp_rk2!(
     fixed_dt = dt === nothing ? nothing : T(dt)
     n_steps = 0
     while state.t < t_final_T - 10 * eps(T)
-        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl=cfl) : fixed_dt
+        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl = cfl) : fixed_dt
         if state.t + step_dt > t_final_T
             step_dt = t_final_T - state.t
         end
-        status = ssp_rk2_step!(state, eq, method, step_dt; du=du, u0=u0, u1=u1)
+        status = ssp_rk2_step!(state, eq, method, step_dt; du = du, u0 = u0, u1 = u1)
         n_steps += 1
         if status != :ok
-            return (status=status, n_steps=n_steps, t=state.t)
+            return (status = status, n_steps = n_steps, t = state.t)
         end
         if n_steps >= max_steps
-            return (status=:max_steps, n_steps=n_steps, t=state.t)
+            return (status = :max_steps, n_steps = n_steps, t = state.t)
         end
     end
-    return (status=:ok, n_steps=n_steps, t=state.t)
+    return (status = :ok, n_steps = n_steps, t = state.t)
 end
 
 function ssp_rk2!(state, eq, t_final; kwargs...)

@@ -12,7 +12,7 @@ using FRForge
 end
 
 @testset "Sod run metrics" begin
-    c = run_sod(; p=2, n_elements=48, method=PerssonAVMethod(), method_name="persson_av")
+    c = run_sod(; p = 2, n_elements = 48, method = PerssonAVMethod(), method_name = "persson_av")
     @test c["pass"]
     @test c["positivity_ok"]
     @test c["case_type"] == "discontinuous"
@@ -25,11 +25,11 @@ end
 
 @testset "Shu-Osher run" begin
     c = run_shu_osher(;
-        p=1,
-        n_elements=80,
-        cfl=0.1,
-        method=PerssonAVMethod(c_av=0.4),
-        method_name="persson_av",
+        p = 1,
+        n_elements = 80,
+        cfl = 0.1,
+        method = PerssonAVMethod(c_av = 0.4),
+        method_name = "persson_av",
     )
     @test c["pass"]
     @test c["positivity_ok"]
@@ -74,4 +74,3 @@ end
     @test 0 < s["composite"] <= 1
     @test s["dissipation"] > 0.5
 end
-

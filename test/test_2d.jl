@@ -21,14 +21,14 @@ end
 end
 
 @testset "2D advection order p=2" begin
-    c = run_advection2d_smooth_order(; p=2, n_list=[4, 8, 16], t_final=1.0, cfl=0.12)
+    c = run_advection2d_smooth_order(; p = 2, n_list = [4, 8, 16], t_final = 1.0, cfl = 0.12)
     @test !c["diverged"]
     @test c["order_pass"]
     @info "2D adv orders=$(c["observed_orders"]) L2=$(c["l2_errors"])"
 end
 
 @testset "2D Euler order p=2" begin
-    c = run_euler2d_smooth_order(; p=2, n_list=[16, 32], t_final=0.25, cfl=0.06)
+    c = run_euler2d_smooth_order(; p = 2, n_list = [16, 32], t_final = 0.25, cfl = 0.06)
     @test !c["diverged"]
     @test c["order_pass"]
     @test c["positivity_ok"]
@@ -36,7 +36,7 @@ end
 end
 
 @testset "2D discontinuous Euler runs" begin
-    c, state, eq = run_euler2d_discontinuous(; p=1, nx=12, ny=12, t_final=0.05)
+    c, state, eq = run_euler2d_discontinuous(; p = 1, nx = 12, ny = 12, t_final = 0.05)
     @test c["pass"]
     @test c["positivity_ok"]
 end
@@ -55,7 +55,7 @@ end
             (x + y < 0.7) ? primitives_to_conserved(eq, 1.0, 0.0, 0.0, 1.0) :
             primitives_to_conserved(eq, 0.125, 0.0, 0.0, 0.1),
     )
-    method = PerssonAVMethod(; c_av=0.1)
+    method = PerssonAVMethod(; c_av = 0.1)
     σ = zeros(mesh.n_elements)
     sense!(σ, method, state.u, state, eq)
     @test all(0 .<= σ .<= 1)
@@ -67,13 +67,13 @@ end
 
 @testset "2D Persson AV discontinuous CI-light" begin
     c, _, _ = run_euler2d_discontinuous(;
-        p=1,
-        nx=12,
-        ny=12,
-        t_final=0.05,
-        cfl=0.08,
-        method=PerssonAVMethod(; c_av=0.1),
-        method_name="persson_av",
+        p = 1,
+        nx = 12,
+        ny = 12,
+        t_final = 0.05,
+        cfl = 0.08,
+        method = PerssonAVMethod(; c_av = 0.1),
+        method_name = "persson_av",
     )
     @test c["pass"]
     @test c["positivity_ok"]
@@ -82,12 +82,12 @@ end
 
 @testset "2D Persson AV smooth stability" begin
     c = run_euler2d_smooth_order(;
-        p=2,
-        n_list=[8, 16],
-        t_final=0.15,
-        cfl=0.05,
-        method=PerssonAVMethod(; c_av=0.1),
-        method_name="persson_av",
+        p = 2,
+        n_list = [8, 16],
+        t_final = 0.15,
+        cfl = 0.05,
+        method = PerssonAVMethod(; c_av = 0.1),
+        method_name = "persson_av",
     )
     @test !c["diverged"]
     @test c["positivity_ok"]
@@ -95,23 +95,44 @@ end
 end
 
 @testset "P3.2 freestream Cartesian and curved" begin
-    c0 = run_freestream_preservation_2d(; p=2, nx=4, ny=4, curved=false)
+    c0 = run_freestream_preservation_2d(; p = 2, nx = 4, ny = 4, curved = false)
     @test c0["pass"]
     @test c0["metrics"]["residual_max"] < 1e-12
     # Analytic wavy metrics: free-stream residual is spectral GCL error
-    c1 = run_freestream_preservation_2d(; p=3, nx=4, ny=4, curved=true, amp=0.05, t_final=0.05)
+    c1 = run_freestream_preservation_2d(;
+        p = 3,
+        nx = 4,
+        ny = 4,
+        curved = true,
+        amp = 0.05,
+        t_final = 0.05,
+    )
     @test c1["pass"]
     @test c1["metrics"]["residual_max"] < 5e-4
     # Convergence check: refining n reduces residual
-    c_coarse = run_freestream_preservation_2d(; p=2, nx=2, ny=2, curved=true, amp=0.05, t_final=0.02)
-    c_fine = run_freestream_preservation_2d(; p=2, nx=8, ny=8, curved=true, amp=0.05, t_final=0.02)
+    c_coarse = run_freestream_preservation_2d(;
+        p = 2,
+        nx = 2,
+        ny = 2,
+        curved = true,
+        amp = 0.05,
+        t_final = 0.02,
+    )
+    c_fine = run_freestream_preservation_2d(;
+        p = 2,
+        nx = 8,
+        ny = 8,
+        curved = true,
+        amp = 0.05,
+        t_final = 0.02,
+    )
     @test c_fine["metrics"]["residual_max"] < 0.25 * c_coarse["metrics"]["residual_max"]
     @info "freestream curved res=$(c1["metrics"]["residual_max"]) err=$(c1["metrics"]["freestream_error"])"
 end
 
 @testset "P3.2 wavy mesh metrics" begin
     ops = build_operators(2)
-    mesh = make_wavy_mesh2d(3, 3, ops; amp=0.05)
+    mesh = make_wavy_mesh2d(3, 3, ops; amp = 0.05)
     @test is_curved_mesh(mesh)
     met = build_mesh_metrics(mesh, ops)
     @test all(met.J .> 0)
@@ -122,12 +143,12 @@ end
     @test !met_a.is_curved
     @test all(j -> abs(j - 0.0625) < 1e-12, met_a.J)
     # Analytic wavy metrics preserve free-stream
-    met_w = build_mesh_metrics_analytic_wavy(mesh, ops; amp=0.05)
+    met_w = build_mesh_metrics_analytic_wavy(mesh, ops; amp = 0.05)
     @test all(met_w.J .> 0)
 end
 
 @testset "P3.2 curved advection order" begin
-    c = run_advection2d_curved_order(; p=2, n_list=[4, 8, 16], amp=0.03, t_final=0.5)
+    c = run_advection2d_curved_order(; p = 2, n_list = [4, 8, 16], amp = 0.03, t_final = 0.5)
     @test !c["diverged"]
     @test c["order_pass"]
     @info "curved adv orders=$(c["observed_orders"]) L2=$(c["l2_errors"])"
@@ -135,18 +156,18 @@ end
 
 @testset "P3.2 curved jump Null + Persson" begin
     c0 = run_euler2d_curved_discontinuous(;
-        p=1, nx=12, ny=12, t_final=0.03, amp=0.01, cfl=0.04, method_name="null",
+        p = 1, nx = 12, ny = 12, t_final = 0.03, amp = 0.01, cfl = 0.04, method_name = "null",
     )
     @test c0["pass"]
     c1 = run_euler2d_curved_discontinuous(;
-        p=1,
-        nx=12,
-        ny=12,
-        t_final=0.03,
-        amp=0.01,
-        cfl=0.04,
-        method=PerssonAVMethod(; c_av=0.1),
-        method_name="persson_av",
+        p = 1,
+        nx = 12,
+        ny = 12,
+        t_final = 0.03,
+        amp = 0.01,
+        cfl = 0.04,
+        method = PerssonAVMethod(; c_av = 0.1),
+        method_name = "persson_av",
     )
     @test c1["pass"]
 end
@@ -174,7 +195,7 @@ end
     ρc, uc, vc, pc = isentropic_vortex_primitives(5.0, 5.0, 0.0)
     @test ρc > 0 && pc > 0 && ρc < 1.0  # core cooler/denser drop
     ρf, _, _, pf = isentropic_vortex_primitives(0.0, 0.0, 0.0)
-    @test isapprox(ρf, 1.0; rtol=1e-8) && isapprox(pf, 1.0; rtol=1e-8)
+    @test isapprox(ρf, 1.0; rtol = 1e-8) && isapprox(pf, 1.0; rtol = 1e-8)
     ops = build_operators(2)
     mesh = Mesh2D(0.0, 10.0, 0.0, 10.0, 4, 4)
     state = allocate_state(mesh, ops, Val(4))
@@ -192,7 +213,7 @@ end
 end
 
 @testset "P3.3a isentropic vortex order CI-light" begin
-    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
+    c = run_isentropic_vortex_order(; p = 2, n_list = [8, 16], t_final = 0.5, cfl = 0.08)
     @test !c["diverged"]
     @test c["positivity_ok"]
     @test c["conservation_pass"]
@@ -202,14 +223,14 @@ end
 
 @testset "P3.3a 2D Riemann cfg6 CI-light" begin
     c, state, eq = run_euler2d_riemann(;
-        p=1,
-        nx=16,
-        ny=16,
-        t_final=0.08,
-        cfl=0.08,
-        config=:cfg6,
-        method=PerssonAVMethod(; c_av=0.1),
-        method_name="persson_av",
+        p = 1,
+        nx = 16,
+        ny = 16,
+        t_final = 0.08,
+        cfl = 0.08,
+        config = :cfg6,
+        method = PerssonAVMethod(; c_av = 0.1),
+        method_name = "persson_av",
     )
     @test c["pass"]
     @test c["positivity_ok"]
@@ -225,14 +246,14 @@ end
     U0 = primitives_to_conserved(eq, 1.0, 0.5, 0.0, 1.0)
     mesh = Mesh2D(
         0.0, 1.0, 0.0, 0.5, 4, 2;
-        left_bc=DirichletBC((x, y, t) -> U0),
-        right_bc=TransmissiveBC(),
-        bottom_bc=ReflectingBC(),
-        top_bc=TransmissiveBC(),
+        left_bc = DirichletBC((x, y, t) -> U0),
+        right_bc = TransmissiveBC(),
+        bottom_bc = ReflectingBC(),
+        top_bc = TransmissiveBC(),
     )
     state = allocate_state(mesh, ops, Val(4))
     set_initial_condition!(state, (x, y) -> U0)
-    result = integrate!(state, eq, NullCapturing(), 0.05; cfl=0.1)
+    result = integrate!(state, eq, NullCapturing(), 0.05; cfl = 0.1)
     @test result.status == :ok
     @test positivity_ok(eq, state)
     err = maximum(abs, state.u[:, :, :, 1] .- 1.0)
@@ -241,17 +262,17 @@ end
 
 @testset "P3.3b reduced Double Mach smoke" begin
     c, _, _ = run_double_mach_reflection(;
-        p=1,
-        nx=12,
-        ny=4,
-        t_final=0.03,
-        cfl=0.04,
-        Lx=1.2,
-        Ly=0.4,
-        strength=:reduced,
-        method=PerssonAVMethod(; c_av=0.2),
-        method_name="persson_av",
-        require_positivity=false,
+        p = 1,
+        nx = 12,
+        ny = 4,
+        t_final = 0.03,
+        cfl = 0.04,
+        Lx = 1.2,
+        Ly = 0.4,
+        strength = :reduced,
+        method = PerssonAVMethod(; c_av = 0.2),
+        method_name = "persson_av",
+        require_positivity = false,
     )
     @test !c["diverged"]
     @test !c["nan_detected"]
@@ -260,19 +281,19 @@ end
 
 @testset "P3.3b reduced FFS smoke" begin
     c, _, _ = run_forward_facing_step(;
-        p=1,
-        nx=12,
-        ny=4,
-        t_final=0.02,
-        cfl=0.025,
-        Lx=1.0,
-        Ly=0.4,
-        step_x=0.3,
-        step_h=0.1,
-        M_in=2.0,
-        method=PerssonAVMethod(; c_av=0.25),
-        method_name="persson_av",
-        require_positivity=false,
+        p = 1,
+        nx = 12,
+        ny = 4,
+        t_final = 0.02,
+        cfl = 0.025,
+        Lx = 1.0,
+        Ly = 0.4,
+        step_x = 0.3,
+        step_h = 0.1,
+        M_in = 2.0,
+        method = PerssonAVMethod(; c_av = 0.25),
+        method_name = "persson_av",
+        require_positivity = false,
     )
     @test !c["diverged"]
     @test !c["nan_detected"]
@@ -293,9 +314,9 @@ end
     residual!(du, state, eq, NullCapturing())
     @test maximum(abs, du) < 1e-12
     # Vortex L2 within FP noise of pre-P4 reference (same n_list so fixed-Δt matches)
-    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
+    c = run_isentropic_vortex_order(; p = 2, n_list = [8, 16], t_final = 0.5, cfl = 0.08)
     @test !c["diverged"]
-    @test isapprox(c["l2_errors"][1], 0.02069688015968434; rtol=1e-12, atol=1e-14)
-    @test isapprox(c["l2_errors"][2], 0.0031146731348864697; rtol=1e-12, atol=1e-14)
-    @test isapprox(c["observed_orders"][1], 2.7322606381318906; rtol=1e-10, atol=1e-12)
+    @test isapprox(c["l2_errors"][1], 0.02069688015968434; rtol = 1e-12, atol = 1e-14)
+    @test isapprox(c["l2_errors"][2], 0.0031146731348864697; rtol = 1e-12, atol = 1e-14)
+    @test isapprox(c["observed_orders"][1], 2.7322606381318906; rtol = 1e-10, atol = 1e-12)
 end

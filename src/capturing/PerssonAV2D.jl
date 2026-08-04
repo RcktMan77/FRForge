@@ -400,12 +400,12 @@ end
 function viscous_mass_residual_scale_2d(
     ops::FROperators{T},
     mesh::Mesh2D{T};
-    p=ops.p,
+    p = ops.p,
 ) where {T}
     state = allocate_state(mesh, ops, Val(1))
     fill!(state.u, one(T))
     eq = LinearAdvection2D(one(T), zero(T))
-    dissip = ElementArtificialViscosity(; c_av=1.0, av_form="conservative_br0", T=T)
+    dissip = ElementArtificialViscosity(; c_av = 1.0, av_form = "conservative_br0", T = T)
     σ = ones(T, mesh.n_elements)
     du = zeros(T, size(state.u)...)
     apply_dissipation!(du, dissip, σ, state.u, state, eq)

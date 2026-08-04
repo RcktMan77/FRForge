@@ -19,13 +19,14 @@ struct SchemeConfig
 end
 
 function SchemeConfig(;
-    points::Symbol=:gl,
-    flux::Symbol=:rusanov,
-    time::Symbol=:ssp_rk3,
+    points::Symbol = :gl,
+    flux::Symbol = :rusanov,
+    time::Symbol = :ssp_rk3,
 )
     points in (:gl, :gll) || throw(ArgumentError("points must be :gl or :gll, got $points"))
     flux in (:rusanov, :hllc) || throw(ArgumentError("flux must be :rusanov or :hllc, got $flux"))
-    time in (:ssp_rk3, :ssp_rk2) || throw(ArgumentError("time must be :ssp_rk3 or :ssp_rk2, got $time"))
+    time in (:ssp_rk3, :ssp_rk2) ||
+        throw(ArgumentError("time must be :ssp_rk3 or :ssp_rk2, got $time"))
     return SchemeConfig(points, flux, time)
 end
 
@@ -54,14 +55,14 @@ end
 Parse CLI / string scheme axes (case-insensitive).
 """
 function parse_scheme(;
-    points::AbstractString="gl",
-    flux::AbstractString="rusanov",
-    time::AbstractString="ssp_rk3",
+    points::AbstractString = "gl",
+    flux::AbstractString = "rusanov",
+    time::AbstractString = "ssp_rk3",
 )
     p = Symbol(lowercase(String(points)))
     f = Symbol(lowercase(String(flux)))
     t = Symbol(lowercase(replace(String(time), "-" => "_")))
-    return SchemeConfig(; points=p, flux=f, time=t)
+    return SchemeConfig(; points = p, flux = f, time = t)
 end
 
 """CFL guidance note for time integrators (documentation / reports)."""

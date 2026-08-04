@@ -25,7 +25,7 @@ Registry-driven source discovery. Tries METHOD_SOURCE_MAP, then
 """
 function resolve_method_sources(
     method_name::AbstractString;
-    extra::AbstractVector{<:AbstractString}=String[],
+    extra::AbstractVector{<:AbstractString} = String[],
 )
     root = package_root()
     files = String[]
@@ -69,7 +69,7 @@ end
 
 function _copy_file!(src::AbstractString, dest::AbstractString)
     mkpath(dirname(dest))
-    cp(src, dest; force=true)
+    cp(src, dest; force = true)
     return dest
 end
 
@@ -86,18 +86,18 @@ Fails if zero source files resolve or if destination exists.
 """
 function freeze_snapshot(;
     method::AbstractString,
-    baseline::AbstractString="persson_av",
+    baseline::AbstractString = "persson_av",
     method_report::AbstractString,
     baseline_report::AbstractString,
-    compare::Union{Nothing,AbstractString}=nothing,
-    out_root::AbstractString=joinpath(package_root(), "results", "snapshots"),
-    git_ref::AbstractString="",
-    source_extra::AbstractVector{<:AbstractString}=String[],
-    log_path::AbstractString=default_experiment_log_path(),
-    append_log::Bool=true,
-    date::Date=Dates.today(),
-    require_confirm::Bool=false,
-    confirm_compare::Union{Nothing,AbstractString}=nothing,
+    compare::Union{Nothing,AbstractString} = nothing,
+    out_root::AbstractString = joinpath(package_root(), "results", "snapshots"),
+    git_ref::AbstractString = "",
+    source_extra::AbstractVector{<:AbstractString} = String[],
+    log_path::AbstractString = default_experiment_log_path(),
+    append_log::Bool = true,
+    date::Date = Dates.today(),
+    require_confirm::Bool = false,
+    confirm_compare::Union{Nothing,AbstractString} = nothing,
 )
     root = package_root()
     isfile(method_report) || error("method_report not found: $method_report")
@@ -105,13 +105,14 @@ function freeze_snapshot(;
 
     conf_ok, conf_note = method_has_confirm_pass(
         method;
-        log_path=log_path,
-        confirm_compare=confirm_compare,
+        log_path = log_path,
+        confirm_compare = confirm_compare,
     )
     if !conf_ok
-        msg = "Fine-mesh confirm not found for method=$method ($conf_note). " *
-              "Paper-facing freezes should run `frforge confirm` first, then " *
-              "`frforge snapshot freeze --require-confirm`."
+        msg =
+            "Fine-mesh confirm not found for method=$method ($conf_note). " *
+            "Paper-facing freezes should run `frforge confirm` first, then " *
+            "`frforge snapshot freeze --require-confirm`."
         if require_confirm
             error(msg)
         else
@@ -119,7 +120,7 @@ function freeze_snapshot(;
         end
     end
 
-    sources = resolve_method_sources(method; extra=source_extra)
+    sources = resolve_method_sources(method; extra = source_extra)
     # verify sources exist
     existing = String[]
     for s in sources
@@ -129,7 +130,9 @@ function freeze_snapshot(;
         end
     end
     isempty(existing) &&
-        error("No source files found for method \"$method\". Register in METHOD_SOURCE_MAP or pass --source.")
+        error(
+            "No source files found for method \"$method\". Register in METHOD_SOURCE_MAP or pass --source.",
+        )
 
     sha = isempty(git_ref) ? git_commit_short() : String(git_ref)
     short = length(sha) > 8 ? sha[1:min(7, length(sha))] : sha
@@ -203,17 +206,20 @@ function freeze_snapshot(;
         end
         abs_s = get(cmp, "absolute_scores", Dict())
         if abs_s isa AbstractDict
-            for k in ("order_preservation", "dissipation", "shock_quality", "robustness", "composite")
+            for k in
+                ("order_preservation", "dissipation", "shock_quality", "robustness", "composite")
                 haskey(abs_s, k) && (primary[k] = abs_s[k])
             end
         end
     end
     met_rep = JSON.parsefile(joinpath(snap_dir, reports["method"]))
     mp = get(met_rep, "method_params", Dict())
-    mp isa AbstractDict && (method_params = Dict{String,Any}(String(k) => v for (k, v) in pairs(mp)))
+    mp isa AbstractDict &&
+        (method_params = Dict{String,Any}(String(k) => v for (k, v) in pairs(mp)))
     if !haskey(primary, "composite")
         scores = get(get(met_rep, "summary", Dict()), "scores", Dict())
-        scores isa AbstractDict && (primary = merge(primary, Dict{String,Any}(String(k) => v for (k, v) in pairs(scores))))
+        scores isa AbstractDict &&
+            (primary = merge(primary, Dict{String,Any}(String(k) => v for (k, v) in pairs(scores))))
     end
 
     # hashes of all packaged files
@@ -267,10 +273,10 @@ function freeze_snapshot(;
     if append_log
         _append_snapshot_log_entry!(
             log_path;
-            method=method,
-            git_ref=sha,
-            snap_path=snap_dir,
-            date=date,
+            method = method,
+            git_ref = sha,
+            snap_path = snap_dir,
+            date = date,
         )
     end
     return abspath(snap_dir)
@@ -287,7 +293,10 @@ function _fill_reproduce_readme(snap::AbstractDict, snap_dir::AbstractString)
     println(io)
     println(io, "## Environment")
     println(io)
-    println(io, "1. Check out git ref `$(snap["git_ref"])` (or a commit that includes this method).")
+    println(
+        io,
+        "1. Check out git ref `$(snap["git_ref"])` (or a commit that includes this method).",
+    )
     println(io, "2. `julia --project=. -e 'using Pkg; Pkg.instantiate()'`")
     println(io, "3. Manifest sha256 at freeze: `$(snap["manifest_sha256"])`")
     println(io)
@@ -315,11 +324,14 @@ function _fill_reproduce_readme(snap::AbstractDict, snap_dir::AbstractString)
     println(io)
     println(io, "## Primary metrics (frozen)")
     println(io)
-    for (k, v) in sort(collect(pairs(snap["primary_metrics"])); by=x -> string(x[1]))
+    for (k, v) in sort(collect(pairs(snap["primary_metrics"])); by = x -> string(x[1]))
         println(io, "- **", k, ":** ", v)
     end
     println(io)
-    println(io, "When to freeze: after invent short-list + fine-mesh confirm (+ robustness) — not after every invent run.")
+    println(
+        io,
+        "When to freeze: after invent short-list + fine-mesh confirm (+ robustness) — not after every invent run.",
+    )
     return String(take!(io))
 end
 
@@ -331,9 +343,9 @@ function _append_snapshot_log_entry!(
     method::AbstractString,
     git_ref::AbstractString,
     snap_path::AbstractString,
-    date::Date=Dates.today(),
+    date::Date = Dates.today(),
 )
-    id = make_entry_id(method; date=date, suffix="snapshot")
+    id = make_entry_id(method; date = date, suffix = "snapshot")
     # avoid id collision
     if isfile(log_path)
         existing = list_experiment_entry_ids(log_path)
@@ -352,11 +364,25 @@ function _append_snapshot_log_entry!(
         println(io, "- **date:** ", Dates.format(date, dateformat"yyyy-mm-dd"))
         println(io, "- **method:** ", method)
         println(io, "- **baseline:** n/a")
-        println(io, "- **hypothesis:** Snapshot freeze for reproducibility (not a new method invent).")
-        println(io, "- **scheme:** points=", FROZEN_INVENT_SCHEME.points, ", flux=", FROZEN_INVENT_SCHEME.flux, ", time=", FROZEN_INVENT_SCHEME.time)
+        println(
+            io,
+            "- **hypothesis:** Snapshot freeze for reproducibility (not a new method invent).",
+        )
+        println(
+            io,
+            "- **scheme:** points=",
+            FROZEN_INVENT_SCHEME.points,
+            ", flux=",
+            FROZEN_INVENT_SCHEME.flux,
+            ", time=",
+            FROZEN_INVENT_SCHEME.time,
+        )
         println(io, "- **metrics:**")
         println(io, "  - candidate_status: snapshot_created")
-        println(io, "- **lessons:** Use `frforge snapshot verify` (cheap) or `--rerun` for full invent.")
+        println(
+            io,
+            "- **lessons:** Use `frforge snapshot verify` (cheap) or `--rerun` for full invent.",
+        )
         println(io, "- **status:** snapshot_created")
         println(io, "- **artifacts:**")
         println(io, "  - snapshot: ", snap_path)
@@ -374,10 +400,10 @@ With `rerun=true`, runs invent and compares metrics (slow — never required CI)
 """
 function verify_snapshot(
     snap_dir::AbstractString;
-    rerun::Bool=false,
-    tol_rel::Real=1e-10,
-    tol_abs::Real=1e-12,
-    require_git_ref::Bool=false,
+    rerun::Bool = false,
+    tol_rel::Real = 1e-10,
+    tol_abs::Real = 1e-12,
+    require_git_ref::Bool = false,
 )
     snap_dir = abspath(snap_dir)
     isdir(snap_dir) || error("Not a directory: $snap_dir")
@@ -402,12 +428,14 @@ function verify_snapshot(
         end
     end
     isfile(joinpath(snap_dir, "README.md")) || push!(errors, "missing README.md")
-    isfile(joinpath(snap_dir, "experiment_entry.md")) || push!(errors, "missing experiment_entry.md")
+    isfile(joinpath(snap_dir, "experiment_entry.md")) ||
+        push!(errors, "missing experiment_entry.md")
 
     if require_git_ref
         cur = git_commit_short()
         ref = string(get(snap, "git_ref", ""))
-        if !isempty(ref) && ref != "unknown" && !startswith(cur, first(ref, min(7, length(ref)))) && cur != ref
+        if !isempty(ref) && ref != "unknown" && !startswith(cur, first(ref, min(7, length(ref)))) &&
+           cur != ref
             push!(errors, "git_ref mismatch: snapshot=$(ref) current=$(cur)")
         end
     end
@@ -426,7 +454,7 @@ function verify_snapshot(
         baseline = string(get(snap, "baseline", "persson_av"))
         # full invent — local/nightly only
         try
-            _, _, cmp = invent_method(method; baseline=baseline, append_log=false)
+            _, _, cmp = invent_method(method; baseline = baseline, append_log = false)
             frozen = get(snap, "primary_metrics", Dict())
             abs_s = get(cmp, "absolute_scores", Dict())
             diffs = Dict{String,Any}()
@@ -436,7 +464,7 @@ function verify_snapshot(
                 fv = frozen[k]
                 nv = get(abs_s, k, get(cmp, k, nothing))
                 if fv isa Number && nv isa Number
-                    if !isapprox(Float64(nv), Float64(fv); rtol=tol_rel, atol=tol_abs)
+                    if !isapprox(Float64(nv), Float64(fv); rtol = tol_rel, atol = tol_abs)
                         ok_metrics = false
                         diffs[k] = Dict("frozen" => fv, "rerun" => nv)
                     end
@@ -465,8 +493,8 @@ Regenerate comparison Markdown/CSV tables from frozen JSON reports.
 """
 function snapshot_tables(
     snap_dir::AbstractString;
-    out_md::Union{Nothing,AbstractString}=nothing,
-    out_csv::Union{Nothing,AbstractString}=nothing,
+    out_md::Union{Nothing,AbstractString} = nothing,
+    out_csv::Union{Nothing,AbstractString} = nothing,
 )
     snap_dir = abspath(snap_dir)
     snap = JSON.parsefile(joinpath(snap_dir, "SNAPSHOT.json"))

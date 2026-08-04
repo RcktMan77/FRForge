@@ -28,7 +28,7 @@ function compute_interface_fluxes!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     t::T;
-    flux_kind::Symbol=:rusanov,
+    flux_kind::Symbol = :rusanov,
 ) where {T,Neq}
     Nel = mesh.n_elements
     fL, fR = ws.fL, ws.fR
@@ -126,11 +126,11 @@ function compute_interface_fluxes(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     t::T;
-    flux_kind::Symbol=:rusanov,
+    flux_kind::Symbol = :rusanov,
 ) where {T,Neq}
     Nel = mesh.n_elements
     ws = ResidualWorkspace1D(T, 1, Nel, Neq)  # Np unused for fluxes
-    return compute_interface_fluxes!(ws, traces, mesh, eq, method, t; flux_kind=flux_kind)
+    return compute_interface_fluxes!(ws, traces, mesh, eq, method, t; flux_kind = flux_kind)
 end
 
 """Extrapolate discontinuous flux to left/right endpoints: sum_j f_j * ℓ_j(±1)."""
@@ -176,7 +176,7 @@ function residual!(
         eq,
         method,
         state.t;
-        flux_kind=state.scheme.flux,
+        flux_kind = state.scheme.flux,
     )
 
     fill!(du, zero(T))

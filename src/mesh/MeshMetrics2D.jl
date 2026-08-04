@@ -262,15 +262,15 @@ function make_wavy_mesh2d(
     nx::Int,
     ny::Int,
     ops::FROperators{T};
-    amp::Real=0.05,
-    x_left=0.0,
-    x_right=1.0,
-    y_bottom=0.0,
-    y_top=1.0,
-    left_bc::AbstractBC=PeriodicBC(),
-    right_bc::AbstractBC=PeriodicBC(),
-    bottom_bc::AbstractBC=PeriodicBC(),
-    top_bc::AbstractBC=PeriodicBC(),
+    amp::Real = 0.05,
+    x_left = 0.0,
+    x_right = 1.0,
+    y_bottom = 0.0,
+    y_top = 1.0,
+    left_bc::AbstractBC = PeriodicBC(),
+    right_bc::AbstractBC = PeriodicBC(),
+    bottom_bc::AbstractBC = PeriodicBC(),
+    top_bc::AbstractBC = PeriodicBC(),
 ) where {T}
     mesh = Mesh2D(
         x_left,
@@ -279,11 +279,11 @@ function make_wavy_mesh2d(
         y_top,
         nx,
         ny;
-        left_bc=left_bc,
-        right_bc=right_bc,
-        bottom_bc=bottom_bc,
-        top_bc=top_bc,
-        T=T,
+        left_bc = left_bc,
+        right_bc = right_bc,
+        bottom_bc = bottom_bc,
+        top_bc = top_bc,
+        T = T,
     )
     a = T(amp)
     apply_geometry_warp!(mesh, ops, (x, y) -> wavy_physical(x, y, a))
@@ -327,7 +327,7 @@ preservation holds (GCL). Prefer this over pure discrete D-metrics for wavy test
 function build_mesh_metrics_analytic_wavy(
     mesh::Mesh2D{T},
     ops::FROperators{T};
-    amp::Real=0.05,
+    amp::Real = 0.05,
 ) where {T}
     Np = n_points(ops)
     Nel = mesh.n_elements

@@ -7,7 +7,10 @@ function _parse_snapshot_args(args)
     sub = args[1]
     rest = args[2:end]
     if sub == "freeze"
-        s = ArgParseSettings(description="Freeze a reproducibility snapshot.", prog="frforge snapshot freeze")
+        s = ArgParseSettings(
+            description = "Freeze a reproducibility snapshot.",
+            prog = "frforge snapshot freeze",
+        )
         @add_arg_table! s begin
             "--method", "-m"
             required = true
@@ -51,8 +54,8 @@ function _parse_snapshot_args(args)
         return opts
     elseif sub == "verify"
         s = ArgParseSettings(
-            description="Verify snapshot (default: cheap hash check; --rerun for invent).",
-            prog="frforge snapshot verify",
+            description = "Verify snapshot (default: cheap hash check; --rerun for invent).",
+            prog = "frforge snapshot verify",
         )
         @add_arg_table! s begin
             "path"
@@ -77,7 +80,10 @@ function _parse_snapshot_args(args)
         opts["sub"] = "verify"
         return opts
     elseif sub == "tables"
-        s = ArgParseSettings(description="Tables from frozen snapshot JSON.", prog="frforge snapshot tables")
+        s = ArgParseSettings(
+            description = "Tables from frozen snapshot JSON.",
+            prog = "frforge snapshot tables",
+        )
         @add_arg_table! s begin
             "path"
             required = true
@@ -113,28 +119,28 @@ function cli_snapshot(args)
         conf_cmp = isempty(opts["confirm_compare"]) ? nothing : opts["confirm_compare"]
         extra = String.(opts["source"])
         dir = freeze_snapshot(;
-            method=opts["method"],
-            baseline=opts["baseline"],
-            method_report=opts["method_report"],
-            baseline_report=opts["baseline_report"],
-            compare=compare,
-            out_root=opts["out"],
-            git_ref=opts["git_ref"],
-            source_extra=extra,
-            log_path=log_path,
-            append_log=!opts["no_append_log"],
-            require_confirm=opts["require_confirm"],
-            confirm_compare=conf_cmp,
+            method = opts["method"],
+            baseline = opts["baseline"],
+            method_report = opts["method_report"],
+            baseline_report = opts["baseline_report"],
+            compare = compare,
+            out_root = opts["out"],
+            git_ref = opts["git_ref"],
+            source_extra = extra,
+            log_path = log_path,
+            append_log = !opts["no_append_log"],
+            require_confirm = opts["require_confirm"],
+            confirm_compare = conf_cmp,
         )
         println("Snapshot frozen: $dir")
         return 0
     elseif sub == "verify"
         res = verify_snapshot(
             opts["path"];
-            rerun=opts["rerun"],
-            tol_rel=opts["tol_rel"],
-            tol_abs=opts["tol_abs"],
-            require_git_ref=opts["require_git_ref"],
+            rerun = opts["rerun"],
+            tol_rel = opts["tol_rel"],
+            tol_abs = opts["tol_abs"],
+            require_git_ref = opts["require_git_ref"],
         )
         println("mode=$(res["mode"]) ok=$(res["ok"]) method=$(res["method"])")
         if !isempty(res["errors"])
@@ -146,7 +152,7 @@ function cli_snapshot(args)
     elseif sub == "tables"
         out_md = isempty(opts["out"]) ? nothing : opts["out"]
         out_csv = isempty(opts["csv"]) ? nothing : opts["csv"]
-        tab = snapshot_tables(opts["path"]; out_md=out_md, out_csv=out_csv)
+        tab = snapshot_tables(opts["path"]; out_md = out_md, out_csv = out_csv)
         print(tab["markdown"])
         out_md !== nothing && println("Wrote $out_md")
         out_csv !== nothing && println("Wrote $out_csv")
@@ -157,4 +163,3 @@ function cli_snapshot(args)
         return 2
     end
 end
-

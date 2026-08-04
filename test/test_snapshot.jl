@@ -25,15 +25,15 @@ end
         write(logp, "# Test log\n\n")
         out_root = joinpath(tmp, "snapshots")
         dir = freeze_snapshot(;
-            method="scaled_persson",
-            baseline="persson_av",
-            method_report=mr,
-            baseline_report=br,
-            compare=cr,
-            out_root=out_root,
-            git_ref="testsha",
-            log_path=logp,
-            append_log=true,
+            method = "scaled_persson",
+            baseline = "persson_av",
+            method_report = mr,
+            baseline_report = br,
+            compare = cr,
+            out_root = out_root,
+            git_ref = "testsha",
+            log_path = logp,
+            append_log = true,
         )
         @test isdir(dir)
         @test isfile(joinpath(dir, "SNAPSHOT.json"))
@@ -50,7 +50,7 @@ end
         @test haskey(snap, "manifest_sha256")
         @test haskey(snap, "primary_metrics")
 
-        res = verify_snapshot(dir; rerun=false)
+        res = verify_snapshot(dir; rerun = false)
         @test res["ok"]
         @test res["mode"] == "cheap"
         @test isempty(res["errors"])
@@ -59,21 +59,21 @@ end
         open(joinpath(dir, "reports", "method.json"), "a") do io
             write(io, "\n")
         end
-        res2 = verify_snapshot(dir; rerun=false)
+        res2 = verify_snapshot(dir; rerun = false)
         @test !res2["ok"]
         @test !isempty(res2["errors"])
 
         # tables from a fresh freeze
         dir2 = freeze_snapshot(;
-            method="scaled_persson",
-            baseline="persson_av",
-            method_report=mr,
-            baseline_report=br,
-            compare=cr,
-            out_root=joinpath(tmp, "snapshots2"),
-            git_ref="testsha2",
-            log_path=logp,
-            append_log=false,
+            method = "scaled_persson",
+            baseline = "persson_av",
+            method_report = mr,
+            baseline_report = br,
+            compare = cr,
+            out_root = joinpath(tmp, "snapshots2"),
+            git_ref = "testsha2",
+            log_path = logp,
+            append_log = false,
         )
         tab = snapshot_tables(dir2)
         @test occursin("scaled_persson", tab["markdown"])
@@ -94,11 +94,11 @@ end
         write(mr, "{\"method_name\":\"nope\",\"summary\":{\"scores\":{}}}")
         write(br, "{\"method_name\":\"persson_av\",\"summary\":{\"scores\":{}}}")
         @test_throws Exception freeze_snapshot(;
-            method="nope_method_not_registered",
-            method_report=mr,
-            baseline_report=br,
-            out_root=joinpath(tmp, "out"),
-            append_log=false,
+            method = "nope_method_not_registered",
+            method_report = mr,
+            baseline_report = br,
+            out_root = joinpath(tmp, "out"),
+            append_log = false,
         )
     end
 end

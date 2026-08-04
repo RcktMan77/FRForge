@@ -9,7 +9,7 @@ struct Euler2D{T} <: AbstractEquation{4}
     γ::T
 end
 
-Euler2D(γ::Real=1.4) = Euler2D{typeof(float(γ))}(float(γ))
+Euler2D(γ::Real = 1.4) = Euler2D{typeof(float(γ))}(float(γ))
 
 function pressure(eq::Euler2D{T}, U::AbstractVector) where {T}
     ρ = max(U[1], eps(T))
@@ -150,7 +150,7 @@ function numerical_flux_n!(
 end
 
 # Allow positivity_ok(eq::Euler2D, state) via Euler1D-style on 4-component
-function positivity_ok(eq::Euler2D{T}, state::SolutionState2D{T,4}; atol=zero(T)) where {T}
+function positivity_ok(eq::Euler2D{T}, state::SolutionState2D{T,4}; atol = zero(T)) where {T}
     Np = size(state.u, 1)
     for e in 1:state.mesh.n_elements, j in 1:Np, i in 1:Np
         U = @view state.u[i, j, e, :]
