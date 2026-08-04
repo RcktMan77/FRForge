@@ -11,22 +11,22 @@
         @test occursin("preset=$name", note)
     end
     @test_throws ErrorException get_confirm_preset("nope")
-    sumd = mesh_summary_dict(get_confirm_preset("quick"), "quick"; include_smooth=false)
+    sumd = mesh_summary_dict(get_confirm_preset("quick"), "quick"; include_smooth = false)
     @test !haskey(sumd, "vortex")
     @test sumd["riemann"]["n"] == 16
 end
 
 @testset "classify_confirm hard gates" begin
     function mk_report(;
-        method="m",
-        overall=true,
-        diverged=false,
-        nan=false,
-        r_pass=true,
-        d_pass=true,
-        order_pass_flag=true,
-        S_order=1.0,
-        S_rob=1.0,
+        method = "m",
+        overall = true,
+        diverged = false,
+        nan = false,
+        r_pass = true,
+        d_pass = true,
+        order_pass_flag = true,
+        S_order = 1.0,
+        S_rob = 1.0,
     )
         cases = Any[
             Dict{String,Any}(
@@ -75,29 +75,29 @@ end
         )
     end
 
-    bas = mk_report(; method="persson_av")
-    met = mk_report(; method="scaled_persson")
-    cmp = classify_confirm(met, bas; preset="quick")
+    bas = mk_report(; method = "persson_av")
+    met = mk_report(; method = "scaled_persson")
+    cmp = classify_confirm(met, bas; preset = "quick")
     @test cmp["confirmation_status"] == "confirmed"
     @test all(r -> r["ok"] === true, cmp["rules"])
 
     # Baseline must finish — hard fail
-    bas_bad = mk_report(; method="persson_av", overall=false, diverged=true)
-    cmp2 = classify_confirm(met, bas_bad; preset="quick")
+    bas_bad = mk_report(; method = "persson_av", overall = false, diverged = true)
+    cmp2 = classify_confirm(met, bas_bad; preset = "quick")
     @test cmp2["confirmation_status"] == "confirmation_failed"
     @test any(r -> r["id"] == "baseline_finished" && r["ok"] == false, cmp2["rules"])
 
     # Method multi-D fail
-    met_bad = mk_report(; method="scaled_persson", r_pass=false, overall=false)
-    cmp3 = classify_confirm(met_bad, bas; preset="quick")
+    met_bad = mk_report(; method = "scaled_persson", r_pass = false, overall = false)
+    cmp3 = classify_confirm(met_bad, bas; preset = "quick")
     @test cmp3["confirmation_status"] == "confirmation_failed"
 
     # Order regression
-    met_ord = mk_report(; method="scaled_persson", S_order=0.0, order_pass_flag=false)
-    bas_ord = mk_report(; method="persson_av", S_order=1.0)
+    met_ord = mk_report(; method = "scaled_persson", S_order = 0.0, order_pass_flag = false)
+    bas_ord = mk_report(; method = "persson_av", S_order = 1.0)
     # method overall still true but order rule fails
     met_ord["overall_pass"] = true
-    cmp4 = classify_confirm(met_ord, bas_ord; preset="quick")
+    cmp4 = classify_confirm(met_ord, bas_ord; preset = "quick")
     @test cmp4["confirmation_status"] == "confirmation_failed"
     @test any(r -> r["id"] == "order_no_regression" && r["ok"] == false, cmp4["rules"])
 end
@@ -119,11 +119,12 @@ end
         "baseline_name" => "persson_av",
         "method_overall_pass" => true,
         "baseline_overall_pass" => true,
-        "absolute_scores" => Dict("order_preservation" => 1.0, "robustness" => 1.0, "composite" => 0.9),
+        "absolute_scores" =>
+            Dict("order_preservation" => 1.0, "robustness" => 1.0, "composite" => 0.9),
         "mesh_summary" => met["mesh_summary"],
         "rules" => Any[],
     )
-    entry = entry_from_confirm("scaled_persson", met, bas, cmp; preset="quick")
+    entry = entry_from_confirm("scaled_persson", met, bas, cmp; preset = "quick")
     @test entry["status"] == "confirmed"
     @test entry["metrics"]["confirmation_status"] == "confirmed"
     @test occursin("riemann", entry["metrics"]["mesh"])
@@ -162,7 +163,9 @@ end
 @testset "method_has_confirm_pass" begin
     mktempdir() do dir
         logp = joinpath(dir, "log.md")
-        write(logp, """
+        write(
+            logp,
+            """
 ### 20260804-m-confirm
 
 - **date:** 2026-08-04
@@ -175,11 +178,12 @@ end
 - **lessons:** ok
 - **status:** confirmed
 - **artifacts:** none
-""")
-        ok, note = method_has_confirm_pass("my_method"; log_path=logp)
+""",
+        )
+        ok, note = method_has_confirm_pass("my_method"; log_path = logp)
         @test ok
         @test occursin("confirmed", note)
-        ok2, _ = method_has_confirm_pass("other"; log_path=logp)
+        ok2, _ = method_has_confirm_pass("other"; log_path = logp)
         @test !ok2
     end
 end

@@ -19,9 +19,10 @@ end
         state = allocate_state(mesh, ops, Val(4))
         set_initial_condition!(
             state,
-            (x, y) -> primitives_to_conserved(eq, 1.0 + 0.1 * sin(2π * x) * sin(2π * y), 0.1, -0.05, 1.0),
+            (x, y) ->
+                primitives_to_conserved(eq, 1.0 + 0.1 * sin(2π * x) * sin(2π * y), 0.1, -0.05, 1.0),
         )
-        method = PerssonAVMethod(; c_av=0.1)
+        method = PerssonAVMethod(; c_av = 0.1)
         du1 = similar(state.u)
         du2 = similar(state.u)
         residual!(du1, state, eq, method)
@@ -56,7 +57,7 @@ end
             state,
             (x, y) -> primitives_to_conserved(eq, 1.0 + 0.2 * x, 0.0, 0.0, 1.0),
         )
-        method = PerssonAVMethod(; c_av=0.1)
+        method = PerssonAVMethod(; c_av = 0.1)
         du_s = similar(state.u)
         du_t = similar(state.u)
         with_serial_residual() do

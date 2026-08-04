@@ -63,7 +63,11 @@ function get_confirm_preset(name::AbstractString)
     return CONFIRM_MESH_PRESETS[key]
 end
 
-function mesh_summary_dict(spec::ConfirmMeshSpec, preset::AbstractString; include_smooth::Bool=true)
+function mesh_summary_dict(
+    spec::ConfirmMeshSpec,
+    preset::AbstractString;
+    include_smooth::Bool = true,
+)
     d = Dict{String,Any}(
         "preset" => String(preset),
         "riemann" => Dict(
@@ -94,7 +98,11 @@ function mesh_summary_dict(spec::ConfirmMeshSpec, preset::AbstractString; includ
     return d
 end
 
-function mesh_note_string(spec::ConfirmMeshSpec, preset::AbstractString; include_smooth::Bool=true)
+function mesh_note_string(
+    spec::ConfirmMeshSpec,
+    preset::AbstractString;
+    include_smooth::Bool = true,
+)
     parts = [
         "preset=$preset",
         "riemann $(spec.riemann_n)² p=$(spec.riemann_p) t=$(spec.riemann_t)",
@@ -118,11 +126,11 @@ Returns (cases, overall_pass, hard_fails, states_for_vtk).
 """
 function run_confirm_suite(
     method_name::AbstractString;
-    preset::AbstractString="confirm",
-    include_smooth::Bool=true,
-    scheme::SchemeConfig=DEFAULT_SCHEME,
-    write_vtk::Bool=false,
-    vtk_dir::Union{Nothing,AbstractString}=nothing,
+    preset::AbstractString = "confirm",
+    include_smooth::Bool = true,
+    scheme::SchemeConfig = DEFAULT_SCHEME,
+    write_vtk::Bool = false,
+    vtk_dir::Union{Nothing,AbstractString} = nothing,
 )
     spec = get_confirm_preset(preset)
     method = get_capturing_method(method_name)
@@ -133,12 +141,12 @@ function run_confirm_suite(
     # --- Isentropic vortex (NullCapturing): multi-D smooth order of the FR core ---
     if include_smooth
         c_v = run_isentropic_vortex_order(;
-            p=spec.vortex_p,
-            n_list=spec.vortex_n_list,
-            t_final=spec.vortex_t,
-            cfl=spec.vortex_cfl,
-            method=NullCapturing(),
-            method_name="null",
+            p = spec.vortex_p,
+            n_list = spec.vortex_n_list,
+            t_final = spec.vortex_t,
+            cfl = spec.vortex_cfl,
+            method = NullCapturing(),
+            method_name = "null",
         )
         c_v["metrics"]["confirm_role"] = "smooth_order_core"
         c_v["metrics"]["confirm_preset"] = String(preset)
@@ -153,15 +161,15 @@ function run_confirm_suite(
 
     # --- 2D Riemann cfg6 ---
     c_r, st_r, eq_r = run_euler2d_riemann(;
-        p=spec.riemann_p,
-        nx=spec.riemann_n,
-        ny=spec.riemann_n,
-        t_final=spec.riemann_t,
-        cfl=spec.riemann_cfl,
-        config=:cfg6,
-        method=method,
-        method_name=method_name,
-        require_positivity=true,
+        p = spec.riemann_p,
+        nx = spec.riemann_n,
+        ny = spec.riemann_n,
+        t_final = spec.riemann_t,
+        cfl = spec.riemann_cfl,
+        config = :cfg6,
+        method = method,
+        method_name = method_name,
+        require_positivity = true,
     )
     c_r["metrics"]["confirm_role"] = "riemann_cfg6"
     c_r["metrics"]["confirm_preset"] = String(preset)
@@ -179,17 +187,17 @@ function run_confirm_suite(
 
     # --- Reduced Double Mach ---
     c_d, st_d, eq_d = run_double_mach_reflection(;
-        p=spec.dmr_p,
-        nx=spec.dmr_nx,
-        ny=spec.dmr_ny,
-        t_final=spec.dmr_t,
-        cfl=spec.dmr_cfl,
-        Lx=spec.dmr_Lx,
-        Ly=spec.dmr_Ly,
-        strength=:reduced,
-        method=method,
-        method_name=method_name,
-        require_positivity=false,
+        p = spec.dmr_p,
+        nx = spec.dmr_nx,
+        ny = spec.dmr_ny,
+        t_final = spec.dmr_t,
+        cfl = spec.dmr_cfl,
+        Lx = spec.dmr_Lx,
+        Ly = spec.dmr_Ly,
+        strength = :reduced,
+        method = method,
+        method_name = method_name,
+        require_positivity = false,
     )
     c_d["metrics"]["confirm_role"] = "double_mach_reduced"
     c_d["metrics"]["confirm_preset"] = String(preset)
@@ -226,46 +234,45 @@ Build a schema v1 report for one method's confirm suite.
 """
 function run_confirm_report(
     method_name::AbstractString;
-    preset::AbstractString="confirm",
-    include_smooth::Bool=true,
-    scheme::SchemeConfig=DEFAULT_SCHEME,
-    write_vtk::Bool=false,
-    vtk_dir::Union{Nothing,AbstractString}=nothing,
-    baseline_name=nothing,
+    preset::AbstractString = "confirm",
+    include_smooth::Bool = true,
+    scheme::SchemeConfig = DEFAULT_SCHEME,
+    write_vtk::Bool = false,
+    vtk_dir::Union{Nothing,AbstractString} = nothing,
+    baseline_name = nothing,
 )
     t0 = time()
     cases, overall, hard_fails, _ = run_confirm_suite(
         method_name;
-        preset=preset,
-        include_smooth=include_smooth,
-        scheme=scheme,
-        write_vtk=write_vtk,
-        vtk_dir=vtk_dir,
+        preset = preset,
+        include_smooth = include_smooth,
+        scheme = scheme,
+        write_vtk = write_vtk,
+        vtk_dir = vtk_dir,
     )
     diverged = any(c -> get(c, "diverged", false) === true, cases)
     nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     m = get_capturing_method(method_name)
     report = report_skeleton(;
-        command="confirm",
-        suite="confirm_$(preset)",
-        method_name=String(method_name),
-        method_params=method_params(m),
-        baseline_name=baseline_name,
-        overall_pass=overall,
-        diverged=diverged,
-        nan_detected=nan_detected,
-        wall_time_sec=time() - t0,
-        hard_gate_failures=hard_fails,
-        cases=cases,
-        fill_scores=true,
-        scheme=scheme,
+        command = "confirm",
+        suite = "confirm_$(preset)",
+        method_name = String(method_name),
+        method_params = method_params(m),
+        baseline_name = baseline_name,
+        overall_pass = overall,
+        diverged = diverged,
+        nan_detected = nan_detected,
+        wall_time_sec = time() - t0,
+        hard_gate_failures = hard_fails,
+        cases = cases,
+        fill_scores = true,
+        scheme = scheme,
     )
     report["confirm_preset"] = String(preset)
     report["mesh_summary"] = mesh_summary_dict(
-        get_confirm_preset(preset), preset; include_smooth=include_smooth,
+        get_confirm_preset(preset), preset; include_smooth = include_smooth,
     )
-    report["scoring_note"] =
-        "Confirm scores are diagnostic on fine multi-D meshes; invent composite (coarse 1D quant) remains the historical score of record."
+    report["scoring_note"] = "Confirm scores are diagnostic on fine multi-D meshes; invent composite (coarse 1D quant) remains the historical score of record."
     return report
 end
 
@@ -291,11 +298,14 @@ function _confirm_rule_baseline_finished(baseline_report, b_cases)
     bas_div = _report_diverged_or_nan(baseline_report, b_cases)
     bas_overall = get(baseline_report, "overall_pass", false) === true
     bas_ok = !bas_div && bas_overall
-    return bas_ok, bas_overall, Dict(
+    return bas_ok,
+    bas_overall,
+    Dict(
         "id" => "baseline_finished",
         "ok" => bas_ok,
-        "notes" => bas_ok ? "baseline completed on fine mesh" :
-                   "baseline diverged/nan or overall_pass=false — cannot credit method",
+        "notes" =>
+            bas_ok ? "baseline completed on fine mesh" :
+            "baseline diverged/nan or overall_pass=false — cannot credit method",
     )
 end
 
@@ -304,7 +314,9 @@ function _confirm_rule_method_hard_gates(method_report, m_cases)
     met_overall = get(method_report, "overall_pass", false) === true
     met_hard = !met_div && met_overall
     fails = get(method_report, "hard_gate_failures", String[])
-    return met_hard, met_overall, Dict(
+    return met_hard,
+    met_overall,
+    Dict(
         "id" => "method_hard_gates",
         "ok" => met_hard,
         "notes" => met_hard ? "method hard gates passed" :
@@ -368,7 +380,7 @@ Baseline divergence/NaN ⇒ confirmation_failed (no accidental method "win").
 function classify_confirm(
     method_report::AbstractDict,
     baseline_report::AbstractDict;
-    preset::AbstractString="confirm",
+    preset::AbstractString = "confirm",
 )
     m_cases = get(method_report, "cases", Any[])
     b_cases = get(baseline_report, "cases", Any[])
@@ -403,7 +415,7 @@ function classify_confirm(
     )
 end
 
-function print_confirm_summary(method_name::AbstractString, cmp::AbstractDict; io::IO=stdout)
+function print_confirm_summary(method_name::AbstractString, cmp::AbstractDict; io::IO = stdout)
     status = cmp["confirmation_status"]
     println(io, "Confirm: $method_name    status: $status    preset: $(get(cmp, "preset", "?"))")
     println(
@@ -427,23 +439,23 @@ function entry_from_confirm(
     method_report::AbstractDict,
     baseline_report::AbstractDict,
     cmp::AbstractDict;
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
-    strengths::AbstractString="",
-    weaknesses::AbstractString="",
-    scheme=FROZEN_INVENT_SCHEME,
-    git_ref::AbstractString="",
-    artifacts::Union{Nothing,AbstractDict}=nothing,
-    entry_id::Union{Nothing,AbstractString}=nothing,
-    date::Date=Dates.today(),
-    preset::AbstractString="confirm",
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
+    strengths::AbstractString = "",
+    weaknesses::AbstractString = "",
+    scheme = FROZEN_INVENT_SCHEME,
+    git_ref::AbstractString = "",
+    artifacts::Union{Nothing,AbstractDict} = nothing,
+    entry_id::Union{Nothing,AbstractString} = nothing,
+    date::Date = Dates.today(),
+    preset::AbstractString = "confirm",
 )
     status = String(get(cmp, "confirmation_status", "confirmation_failed"))
     scores = get(cmp, "absolute_scores", Dict())
     mesh = get(cmp, "mesh_summary", get(method_report, "mesh_summary", Dict()))
     mesh_note = if mesh isa AbstractDict && haskey(mesh, "preset")
         mesh_note_string(get_confirm_preset(string(mesh["preset"])), string(mesh["preset"]);
-            include_smooth=haskey(mesh, "vortex"))
+            include_smooth = haskey(mesh, "vortex"))
     else
         "preset=$preset"
     end
@@ -451,11 +463,16 @@ function entry_from_confirm(
     hyp = String(hypothesis)
     les = String(lessons)
     isempty(strip(hyp)) &&
-        (hyp = "Fine-mesh confirmation of short-listed method (coarse invent remains score of record).")
+        (
+            hyp = "Fine-mesh confirmation of short-listed method (coarse invent remains score of record)."
+        )
     isempty(strip(les)) &&
-        (les = status == "confirmed" ?
-         "Confirmed on fine multi-D meshes; safe to consider robustness + snapshot freeze with --require-confirm." :
-         "Confirmation failed — do not promote; inspect rules/artifacts before retrying.")
+        (
+            les =
+                status == "confirmed" ?
+                "Confirmed on fine multi-D meshes; safe to consider robustness + snapshot freeze with --require-confirm." :
+                "Confirmation failed — do not promote; inspect rules/artifacts before retrying."
+        )
 
     arts = if artifacts !== nothing
         Dict{String,Any}(String(k) => v for (k, v) in pairs(artifacts))
@@ -481,7 +498,7 @@ function entry_from_confirm(
 
     suffix = preset == "confirm" ? "confirm" : "confirm_$(preset)"
     return Dict{String,Any}(
-        "id" => something(entry_id, make_entry_id(method_name; date=date, suffix=suffix)),
+        "id" => something(entry_id, make_entry_id(method_name; date = date, suffix = suffix)),
         "date" => string(date),
         "method" => String(method_name),
         "baseline" => string(something(get(cmp, "baseline_name", nothing), "persson_av")),
@@ -517,24 +534,24 @@ Orchestrate fine-mesh confirmation for method vs baseline.
 """
 function confirm_method(
     method_name::AbstractString;
-    baseline::AbstractString="persson_av",
-    preset::AbstractString="confirm",
-    report_dir::AbstractString="results/confirm",
-    include_smooth::Bool=true,
-    write_vtk::Bool=false,
-    scheme::SchemeConfig=DEFAULT_SCHEME,
-    append_log::Bool=true,
-    log_path::Union{Nothing,AbstractString}=nothing,
-    yaml_path::Union{Nothing,AbstractString}=nothing,
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
-    strengths::AbstractString="",
-    weaknesses::AbstractString="",
-    git_ref::AbstractString="",
-    threads::Int=1,
+    baseline::AbstractString = "persson_av",
+    preset::AbstractString = "confirm",
+    report_dir::AbstractString = "results/confirm",
+    include_smooth::Bool = true,
+    write_vtk::Bool = false,
+    scheme::SchemeConfig = DEFAULT_SCHEME,
+    append_log::Bool = true,
+    log_path::Union{Nothing,AbstractString} = nothing,
+    yaml_path::Union{Nothing,AbstractString} = nothing,
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
+    strengths::AbstractString = "",
+    weaknesses::AbstractString = "",
+    git_ref::AbstractString = "",
+    threads::Int = 1,
 )
     method_name = require_registered_method(method_name)
-    baseline = require_registered_method(baseline; role="baseline")
+    baseline = require_registered_method(baseline; role = "baseline")
     spec = get_confirm_preset(preset)
     mkpath(report_dir)
     vtk_dir = write_vtk ? joinpath(report_dir, "vtu") : nothing
@@ -547,7 +564,7 @@ function confirm_method(
     println("=== FRForge confirm (fine-mesh short-list gate) ===")
     println("method=$method_name  baseline=$baseline  preset=$preset")
     println("scheme=", scheme_dict(scheme))
-    println("mesh: ", mesh_note_string(spec, preset; include_smooth=include_smooth))
+    println("mesh: ", mesh_note_string(spec, preset; include_smooth = include_smooth))
     println(spec.wall_time_note)
     println(
         "Note: invent composite history is unchanged; this is a separate confirmation stream.",
@@ -572,48 +589,50 @@ function confirm_method(
     end
 
     return with_frforge_threads(use_threads) do
-        paths = report_trio_paths(report_dir, method_name, baseline; tag=String(preset))
+        paths = report_trio_paths(report_dir, method_name, baseline; tag = String(preset))
         bas_path, met_path, cmp_path = paths.baseline, paths.method, paths.compare
 
-        println("residual threads: $(frforge_thread_count())  (julia nthreads=$(Threads.nthreads()))")
+        println(
+            "residual threads: $(frforge_thread_count())  (julia nthreads=$(Threads.nthreads()))",
+        )
         println("\n--- Baseline confirm: $baseline ---")
         bas = run_confirm_report(
             baseline;
-            preset=preset,
-            include_smooth=include_smooth,
-            scheme=scheme,
-            write_vtk=false,
-            baseline_name=nothing,
+            preset = preset,
+            include_smooth = include_smooth,
+            scheme = scheme,
+            write_vtk = false,
+            baseline_name = nothing,
         )
         stamp_workflow_report!(
             bas;
-            command="confirm",
-            baseline_name=nothing,
-            scheme=scheme,
-            extra=Dict{String,Any}("confirm_official" => official),
+            command = "confirm",
+            baseline_name = nothing,
+            scheme = scheme,
+            extra = Dict{String,Any}("confirm_official" => official),
         )
         write_report(bas_path, bas)
 
         println("\n--- Method confirm: $method_name ---")
         met = run_confirm_report(
             method_name;
-            preset=preset,
-            include_smooth=include_smooth,
-            scheme=scheme,
-            write_vtk=write_vtk,
-            vtk_dir=vtk_dir,
-            baseline_name=baseline,
+            preset = preset,
+            include_smooth = include_smooth,
+            scheme = scheme,
+            write_vtk = write_vtk,
+            vtk_dir = vtk_dir,
+            baseline_name = baseline,
         )
         stamp_workflow_report!(
             met;
-            command="confirm",
-            baseline_name=baseline,
-            scheme=scheme,
-            extra=Dict{String,Any}("confirm_official" => official),
+            command = "confirm",
+            baseline_name = baseline,
+            scheme = scheme,
+            extra = Dict{String,Any}("confirm_official" => official),
         )
         write_report(met_path, met)
 
-        cmp = classify_confirm(met, bas; preset=preset)
+        cmp = classify_confirm(met, bas; preset = preset)
         if !official
             # Do not claim confirmed for promotion when threaded
             cmp["confirmation_status"] = "confirmation_failed"
@@ -651,14 +670,14 @@ function confirm_method(
                 met,
                 bas,
                 cmp;
-                hypothesis=hypothesis,
-                lessons=lessons,
-                strengths=strengths,
-                weaknesses=weaknesses,
-                scheme=scheme,
-                git_ref=git_ref,
-                artifacts=arts,
-                preset=preset,
+                hypothesis = hypothesis,
+                lessons = lessons,
+                strengths = strengths,
+                weaknesses = weaknesses,
+                scheme = scheme,
+                git_ref = git_ref,
+                artifacts = arts,
+                preset = preset,
             )
             if !official
                 entry["status"] = "confirmation_failed"
@@ -668,7 +687,7 @@ function confirm_method(
                     "Threaded confirm only — re-run serial confirm before promotion. " *
                     string(get(entry, "lessons", ""))
             end
-            append_experiment_entry!(entry; path=lp, yaml_path=yp_use)
+            append_experiment_entry!(entry; path = lp, yaml_path = yp_use)
             println("Experiment log appended: $(entry["id"])  →  $lp")
         end
 
@@ -683,8 +702,8 @@ True if a confirmed log entry or confirm compare JSON exists for method.
 """
 function method_has_confirm_pass(
     method::AbstractString;
-    log_path::AbstractString=default_experiment_log_path(),
-    confirm_compare::Union{Nothing,AbstractString}=nothing,
+    log_path::AbstractString = default_experiment_log_path(),
+    confirm_compare::Union{Nothing,AbstractString} = nothing,
 )
     if confirm_compare !== nothing && isfile(confirm_compare)
         cmp = JSON.parsefile(confirm_compare)

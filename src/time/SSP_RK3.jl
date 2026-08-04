@@ -5,7 +5,7 @@
 
 Δt = CFL * min_e (Δx_e / ((2p+1) λ_max)).
 """
-function compute_dt(state::SolutionState{T}, eq; cfl::Real=0.2) where {T}
+function compute_dt(state::SolutionState{T}, eq; cfl::Real = 0.2) where {T}
     mesh, ops = state.mesh, state.ops
     p = ops.p
     λ = max_wave_speed(eq, state.u)
@@ -31,10 +31,10 @@ function ssp_rk3_step!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     Δt::T;
-    du=similar(state.u),
-    u0=similar(state.u),
-    u1=similar(state.u),
-    u2=similar(state.u),
+    du = similar(state.u),
+    u0 = similar(state.u),
+    u1 = similar(state.u),
+    u2 = similar(state.u),
 ) where {T,Neq}
     copyto!(u0, state.u)
     t0 = state.t
@@ -77,11 +77,11 @@ function ssp_rk3!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     t_final::Real;
-    cfl::Real=0.2,
-    dt::Union{Nothing,Real}=nothing,
-    max_steps::Int=10^7,
-    progress_every::Int=0,
-    progress_label::AbstractString="",
+    cfl::Real = 0.2,
+    dt::Union{Nothing,Real} = nothing,
+    max_steps::Int = 10^7,
+    progress_every::Int = 0,
+    progress_label::AbstractString = "",
 ) where {T,Neq}
     t_final_T = T(t_final)
     du = similar(state.u)
@@ -92,11 +92,11 @@ function ssp_rk3!(
 
     n_steps = 0
     while state.t < t_final_T - 10 * eps(T)
-        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl=cfl) : fixed_dt
+        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl = cfl) : fixed_dt
         if state.t + step_dt > t_final_T
             step_dt = t_final_T - state.t
         end
-        status = ssp_rk3_step!(state, eq, method, step_dt; du=du, u0=u0, u1=u1, u2=u2)
+        status = ssp_rk3_step!(state, eq, method, step_dt; du = du, u0 = u0, u1 = u1, u2 = u2)
         n_steps += 1
         if progress_every > 0 && (n_steps % progress_every == 0)
             pct = 100 * Float64(state.t) / max(Float64(t_final_T), eps(Float64))
@@ -108,13 +108,13 @@ function ssp_rk3!(
             flush(stdout)
         end
         if status != :ok
-            return (status=status, n_steps=n_steps, t=state.t)
+            return (status = status, n_steps = n_steps, t = state.t)
         end
         if n_steps >= max_steps
-            return (status=:max_steps, n_steps=n_steps, t=state.t)
+            return (status = :max_steps, n_steps = n_steps, t = state.t)
         end
     end
-    return (status=:ok, n_steps=n_steps, t=state.t)
+    return (status = :ok, n_steps = n_steps, t = state.t)
 end
 
 function ssp_rk3!(state, eq, t_final; kwargs...)
@@ -123,7 +123,7 @@ end
 
 # --- 2D variants (same Shu–Osher stages) ---
 
-function compute_dt(state::SolutionState2D{T}, eq; cfl::Real=0.2) where {T}
+function compute_dt(state::SolutionState2D{T}, eq; cfl::Real = 0.2) where {T}
     ops = state.ops
     p = ops.p
     λ = max_wave_speed(eq, state.u)
@@ -137,10 +137,10 @@ function ssp_rk3_step!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     Δt::T;
-    du=similar(state.u),
-    u0=similar(state.u),
-    u1=similar(state.u),
-    u2=similar(state.u),
+    du = similar(state.u),
+    u0 = similar(state.u),
+    u1 = similar(state.u),
+    u2 = similar(state.u),
 ) where {T,Neq}
     copyto!(u0, state.u)
     t0 = state.t
@@ -168,11 +168,11 @@ function ssp_rk3!(
     eq::AbstractEquation{Neq},
     method::AbstractCapturingMethod,
     t_final::Real;
-    cfl::Real=0.2,
-    dt::Union{Nothing,Real}=nothing,
-    max_steps::Int=10^7,
-    progress_every::Int=0,
-    progress_label::AbstractString="",
+    cfl::Real = 0.2,
+    dt::Union{Nothing,Real} = nothing,
+    max_steps::Int = 10^7,
+    progress_every::Int = 0,
+    progress_label::AbstractString = "",
 ) where {T,Neq}
     t_final_T = T(t_final)
     du = similar(state.u)
@@ -183,11 +183,11 @@ function ssp_rk3!(
     n_steps = 0
     t_wall0 = time()
     while state.t < t_final_T - 10 * eps(T)
-        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl=cfl) : fixed_dt
+        step_dt = fixed_dt === nothing ? compute_dt(state, eq; cfl = cfl) : fixed_dt
         if state.t + step_dt > t_final_T
             step_dt = t_final_T - state.t
         end
-        status = ssp_rk3_step!(state, eq, method, step_dt; du=du, u0=u0, u1=u1, u2=u2)
+        status = ssp_rk3_step!(state, eq, method, step_dt; du = du, u0 = u0, u1 = u1, u2 = u2)
         n_steps += 1
         if progress_every > 0 && (n_steps % progress_every == 0)
             pct = 100 * Float64(state.t) / max(Float64(t_final_T), eps(Float64))
@@ -201,11 +201,11 @@ function ssp_rk3!(
             flush(stdout)
         end
         if status != :ok
-            return (status=status, n_steps=n_steps, t=state.t)
+            return (status = status, n_steps = n_steps, t = state.t)
         end
         if n_steps >= max_steps
-            return (status=:max_steps, n_steps=n_steps, t=state.t)
+            return (status = :max_steps, n_steps = n_steps, t = state.t)
         end
     end
-    return (status=:ok, n_steps=n_steps, t=state.t)
+    return (status = :ok, n_steps = n_steps, t = state.t)
 end

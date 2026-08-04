@@ -23,9 +23,9 @@ Invent history must use `DEFAULT_SCHEME` unless a logged re-baseline is recorded
 """
 function run_method_report(
     method_name::AbstractString;
-    suite::Symbol=:quant,
-    seed=nothing,
-    scheme::SchemeConfig=DEFAULT_SCHEME,
+    suite::Symbol = :quant,
+    seed = nothing,
+    scheme::SchemeConfig = DEFAULT_SCHEME,
 )
     # Invent/score path always serial residual (bit-deterministic composite history)
     return with_serial_residual() do
@@ -33,7 +33,7 @@ function run_method_report(
         light = suite === :light || suite === :robustness_light
         if suite === :quant || suite === :m5 || light
             cases, overall, hard_fails =
-                run_m5_quant_suite(; method_name=method_name, scheme=scheme, light=light)
+                run_m5_quant_suite(; method_name = method_name, scheme = scheme, light = light)
         else
             error("unsupported suite=$suite (use :quant, :m5, or :light)")
         end
@@ -41,19 +41,19 @@ function run_method_report(
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
         m = get_capturing_method(method_name)
         report = report_skeleton(;
-            command="invent",
-            suite=light ? "light" : String(suite),
-            method_name=String(method_name),
-            method_params=method_params(m),
-            baseline_name=nothing,
-            overall_pass=overall,
-            diverged=diverged,
-            nan_detected=nan_detected,
-            wall_time_sec=time() - t0,
-            hard_gate_failures=hard_fails,
-            cases=cases,
-            fill_scores=true,
-            scheme=scheme,
+            command = "invent",
+            suite = light ? "light" : String(suite),
+            method_name = String(method_name),
+            method_params = method_params(m),
+            baseline_name = nothing,
+            overall_pass = overall,
+            diverged = diverged,
+            nan_detected = nan_detected,
+            wall_time_sec = time() - t0,
+            hard_gate_failures = hard_fails,
+            cases = cases,
+            fill_scores = true,
+            scheme = scheme,
         )
         if seed !== nothing
             report["method_params"]["seed"] = seed
@@ -105,13 +105,13 @@ function report_trio_paths(
     report_dir::AbstractString,
     method::AbstractString,
     baseline::AbstractString;
-    tag::AbstractString="",
+    tag::AbstractString = "",
 )
     suffix = isempty(tag) ? "" : "_$(tag)"
     return (
-        method=joinpath(report_dir, "method_$(method)$(suffix).json"),
-        baseline=joinpath(report_dir, "baseline_$(baseline)$(suffix).json"),
-        compare=joinpath(report_dir, "compare_$(method)_vs_$(baseline)$(suffix).json"),
+        method = joinpath(report_dir, "method_$(method)$(suffix).json"),
+        baseline = joinpath(report_dir, "baseline_$(baseline)$(suffix).json"),
+        compare = joinpath(report_dir, "compare_$(method)_vs_$(baseline)$(suffix).json"),
     )
 end
 
@@ -121,9 +121,9 @@ Stamp invent/confirm bookkeeping fields on a report dict (in-place).
 function stamp_workflow_report!(
     report::AbstractDict;
     command::AbstractString,
-    baseline_name=nothing,
-    scheme::SchemeConfig=DEFAULT_SCHEME,
-    extra::AbstractDict=Dict{String,Any}(),
+    baseline_name = nothing,
+    scheme::SchemeConfig = DEFAULT_SCHEME,
+    extra::AbstractDict = Dict{String,Any}(),
 )
     report["command"] = command
     report["baseline_name"] = baseline_name

@@ -21,21 +21,21 @@ function allocate_state(
     mesh::Mesh2D{T},
     ops::FROperators{T},
     ::Val{Neq};
-    scheme::Union{Nothing,SchemeConfig}=nothing,
-    metrics::Union{Nothing,MeshMetrics2D{T}}=nothing,
-    wavy_amp::Union{Nothing,Real}=nothing,
+    scheme::Union{Nothing,SchemeConfig} = nothing,
+    metrics::Union{Nothing,MeshMetrics2D{T}} = nothing,
+    wavy_amp::Union{Nothing,Real} = nothing,
 ) where {T,Neq}
     Np = n_points(ops)
     Nel = mesh.n_elements
     u = zeros(T, Np, Np, Nel, Neq)
     sch = something(
         scheme,
-        SchemeConfig(; points=ops.points, flux=DEFAULT_SCHEME.flux, time=DEFAULT_SCHEME.time),
+        SchemeConfig(; points = ops.points, flux = DEFAULT_SCHEME.flux, time = DEFAULT_SCHEME.time),
     )
     met = if metrics !== nothing
         metrics
     elseif wavy_amp !== nothing
-        build_mesh_metrics_analytic_wavy(mesh, ops; amp=wavy_amp)
+        build_mesh_metrics_analytic_wavy(mesh, ops; amp = wavy_amp)
     else
         build_mesh_metrics(mesh, ops)
     end
@@ -46,12 +46,12 @@ function allocate_state(
     mesh::Mesh2D{T},
     ops::FROperators{T},
     neq::Int;
-    scheme::Union{Nothing,SchemeConfig}=nothing,
-    metrics::Union{Nothing,MeshMetrics2D{T}}=nothing,
-    wavy_amp::Union{Nothing,Real}=nothing,
+    scheme::Union{Nothing,SchemeConfig} = nothing,
+    metrics::Union{Nothing,MeshMetrics2D{T}} = nothing,
+    wavy_amp::Union{Nothing,Real} = nothing,
 ) where {T}
     return allocate_state(
-        mesh, ops, Val(neq); scheme=scheme, metrics=metrics, wavy_amp=wavy_amp,
+        mesh, ops, Val(neq); scheme = scheme, metrics = metrics, wavy_amp = wavy_amp,
     )
 end
 
@@ -82,7 +82,7 @@ function set_initial_condition!(state::SolutionState2D{T,Neq}, f) where {T,Neq}
 end
 
 """Discrete integral of component `c` using |J| metric weights."""
-function discrete_mass(state::SolutionState2D{T}, c::Int=1) where {T}
+function discrete_mass(state::SolutionState2D{T}, c::Int = 1) where {T}
     ops = state.ops
     met = state.metrics
     Np = n_points(ops)
@@ -95,7 +95,7 @@ function discrete_mass(state::SolutionState2D{T}, c::Int=1) where {T}
     return m
 end
 
-function l2_error(state::SolutionState2D{T}, uexact, c::Int=1) where {T}
+function l2_error(state::SolutionState2D{T}, uexact, c::Int = 1) where {T}
     mesh, ops, met = state.mesh, state.ops, state.metrics
     Np = n_points(ops)
     acc = zero(T)

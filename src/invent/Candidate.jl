@@ -136,8 +136,8 @@ Return candidate_status and comparison fields per design.
 function classify_candidate(
     method_report::AbstractDict,
     baseline_report::AbstractDict;
-    δ::Real=DEFAULT_SCORE_MARGIN,
-    vtk_produced::Bool=false,
+    δ::Real = DEFAULT_SCORE_MARGIN,
+    vtk_produced::Bool = false,
 )
     overall = get(method_report, "overall_pass", false) === true
     m_scores = method_report["summary"]["scores"]
@@ -151,13 +151,15 @@ function classify_candidate(
     margin = c_m - c_b
     t_ok, t_notes = tradeoff_ok(m_scores, b_scores)
 
-    status = if !overall || get(method_report, "diverged", false) || get(method_report, "nan_detected", false)
-        "rejected"
-    elseif margin >= float(δ) && t_ok
-        vtk_produced ? "accepted_candidate" : "promising"
-    else
-        "pass_gates"
-    end
+    status =
+        if !overall || get(method_report, "diverged", false) ||
+           get(method_report, "nan_detected", false)
+            "rejected"
+        elseif margin >= float(δ) && t_ok
+            vtk_produced ? "accepted_candidate" : "promising"
+        else
+            "pass_gates"
+        end
 
     return Dict{String,Any}(
         "candidate_status" => status,
@@ -180,7 +182,7 @@ end
 
 Human-readable invent/score summary required by design.
 """
-function print_candidate_summary(method_name::AbstractString, cmp::AbstractDict; io::IO=stdout)
+function print_candidate_summary(method_name::AbstractString, cmp::AbstractDict; io::IO = stdout)
     status = cmp["candidate_status"]
     baseline = something(cmp["baseline_name"], "none")
     println(io, "Method: $method_name    status: $status")

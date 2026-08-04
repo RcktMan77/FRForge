@@ -9,7 +9,12 @@ struct FaceScratch2D{T}
 end
 
 FaceScratch2D(::Type{T}, Neq::Int) where {T} =
-    FaceScratch2D{T}(Vector{T}(undef, Neq), Vector{T}(undef, Neq), Vector{T}(undef, Neq), Vector{T}(undef, Neq))
+    FaceScratch2D{T}(
+        Vector{T}(undef, Neq),
+        Vector{T}(undef, Neq),
+        Vector{T}(undef, Neq),
+        Vector{T}(undef, Neq),
+    )
 
 """2D residual workspace owned by SolutionState2D."""
 mutable struct ResidualWorkspace2D{T}

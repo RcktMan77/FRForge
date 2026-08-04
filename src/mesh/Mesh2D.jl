@@ -39,12 +39,12 @@ function Mesh2D(
     y_top,
     nx::Int,
     ny::Int;
-    left_bc::AbstractBC=PeriodicBC(),
-    right_bc::AbstractBC=PeriodicBC(),
-    bottom_bc::AbstractBC=PeriodicBC(),
-    top_bc::AbstractBC=PeriodicBC(),
-    solid::Union{Nothing,AbstractVector{Bool}}=nothing,
-    T::Type=Float64,
+    left_bc::AbstractBC = PeriodicBC(),
+    right_bc::AbstractBC = PeriodicBC(),
+    bottom_bc::AbstractBC = PeriodicBC(),
+    top_bc::AbstractBC = PeriodicBC(),
+    solid::Union{Nothing,AbstractVector{Bool}} = nothing,
+    T::Type = Float64,
 )
     nx >= 1 && ny >= 1 || throw(ArgumentError("nx, ny must be >= 1"))
     x_right > x_left || throw(ArgumentError("x_right > x_left required"))
@@ -57,8 +57,8 @@ function Mesh2D(
         (bottom_bc isa PeriodicBC && top_bc isa PeriodicBC) ||
             throw(ArgumentError("y-periodic requires both bottom and top PeriodicBC"))
     end
-    xv = collect(range(T(x_left), T(x_right); length=nx + 1))
-    yv = collect(range(T(y_bottom), T(y_top); length=ny + 1))
+    xv = collect(range(T(x_left), T(x_right); length = nx + 1))
+    yv = collect(range(T(y_bottom), T(y_top); length = ny + 1))
     Δx = diff(xv)
     Δy = diff(yv)
     Nel = nx * ny

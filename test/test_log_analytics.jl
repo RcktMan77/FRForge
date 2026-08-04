@@ -27,7 +27,8 @@ using Dates
     @test get(sc["metrics"], "candidate_status", "") == "pass_gates"
     @test sc["metrics"]["composite"] isa Number
     @test sc["metrics"]["composite"] > 0.9
-    @test occursin("NullCapturing", sc["lessons"]) || occursin("structural", lowercase(sc["lessons"]))
+    @test occursin("NullCapturing", sc["lessons"]) ||
+          occursin("structural", lowercase(sc["lessons"]))
 
     plat = get_experiment_entry(entries, "20260803-m0-m8-platform")
     @test plat !== nothing
@@ -80,7 +81,7 @@ end
     @test toy !== nothing
     @test toy["method"] == "toy_method"
     @test toy["metrics"]["composite"] isa Number
-    @test isapprox(toy["metrics"]["composite"], 0.91; atol=1e-9)
+    @test isapprox(toy["metrics"]["composite"], 0.91; atol = 1e-9)
     @test toy["metrics"]["candidate_status"] == "pass_gates"
     @test isempty(get(toy, "strengths", ""))  # missing optional
     @test occursin("c_av", toy["lessons"])
@@ -88,11 +89,11 @@ end
 
 @testset "round-trip invent entry markdown" begin
     bas = FRForge.report_skeleton(;
-        command="invent",
-        suite="quant",
-        method_name="persson_av",
-        overall_pass=true,
-        cases=Any[
+        command = "invent",
+        suite = "quant",
+        method_name = "persson_av",
+        overall_pass = true,
+        cases = Any[
             Dict(
                 "name" => "euler_smooth_order_p2",
                 "case_type" => "smooth_order",
@@ -130,21 +131,21 @@ end
                 "metrics" => Dict{String,Any}(),
             ),
         ],
-        fill_scores=true,
+        fill_scores = true,
     )
     met = deepcopy(bas)
     met["method_name"] = "rt_method"
     met["cases"][2]["excess_dissipation"] = 0.01
     met["summary"]["scores"] = score_suite_absolute(met["cases"])
-    cmp = classify_candidate(met, bas; δ=0.02, vtk_produced=false)
-    entry = entry_from_invent("rt_method", met, bas, cmp; hypothesis="H", lessons="L")
+    cmp = classify_candidate(met, bas; δ = 0.02, vtk_produced = false)
+    entry = entry_from_invent("rt_method", met, bas, cmp; hypothesis = "H", lessons = "L")
     md = format_entry_markdown(entry)
     parsed = parse_experiment_log_text("# Entries\n\n" * md)
     @test length(parsed) == 1
     p = parsed[1]
     @test p["method"] == "rt_method"
     @test p["metrics"]["composite"] isa Number
-    @test isapprox(p["metrics"]["composite"], entry["metrics"]["composite"]; rtol=1e-12)
+    @test isapprox(p["metrics"]["composite"], entry["metrics"]["composite"]; rtol = 1e-12)
     @test p["hypothesis"] == "H"
     @test p["lessons"] == "L"
 end
@@ -169,7 +170,7 @@ end
     # scaled_persson has full numeric scores
     @test any(r -> r["method"] == "scaled_persson", pareto)
 
-    lessons = log_lessons(entries; query="NullCapturing")
+    lessons = log_lessons(entries; query = "NullCapturing")
     @test !isempty(lessons)
     @test any(r -> occursin("NullCapturing", r["text"]), lessons)
 

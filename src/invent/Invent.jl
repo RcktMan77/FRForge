@@ -46,14 +46,14 @@ function _invent_append_if_requested!(
         met,
         bas,
         cmp;
-        log_path=lp,
-        yaml_path=yp_use,
-        artifacts=arts,
-        hypothesis=hypothesis,
-        lessons=lessons,
-        strengths=strengths,
-        weaknesses=weaknesses,
-        git_ref=git_ref,
+        log_path = lp,
+        yaml_path = yp_use,
+        artifacts = arts,
+        hypothesis = hypothesis,
+        lessons = lessons,
+        strengths = strengths,
+        weaknesses = weaknesses,
+        git_ref = git_ref,
     )
     println("Experiment log appended: $(entry["id"])  →  $lp")
     if get(entry, "narrative_complete", true) === false
@@ -78,22 +78,22 @@ Returns (method_report, baseline_report, comparison_dict).
 """
 function invent_method(
     method_name::AbstractString;
-    baseline::AbstractString="persson_av",
-    report_dir::AbstractString="results/invent",
-    δ::Real=DEFAULT_SCORE_MARGIN,
-    vtk_produced::Bool=false,
-    seed=nothing,
-    append_log::Bool=true,
-    log_path::Union{Nothing,AbstractString}=nothing,
-    yaml_path::Union{Nothing,AbstractString}=nothing,
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
-    strengths::AbstractString="",
-    weaknesses::AbstractString="",
-    git_ref::AbstractString="",
+    baseline::AbstractString = "persson_av",
+    report_dir::AbstractString = "results/invent",
+    δ::Real = DEFAULT_SCORE_MARGIN,
+    vtk_produced::Bool = false,
+    seed = nothing,
+    append_log::Bool = true,
+    log_path::Union{Nothing,AbstractString} = nothing,
+    yaml_path::Union{Nothing,AbstractString} = nothing,
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
+    strengths::AbstractString = "",
+    weaknesses::AbstractString = "",
+    git_ref::AbstractString = "",
 )
     method_name = require_registered_method(method_name)
-    baseline = require_registered_method(baseline; role="baseline")
+    baseline = require_registered_method(baseline; role = "baseline")
 
     mkpath(report_dir)
     paths = report_trio_paths(report_dir, method_name, baseline)
@@ -110,16 +110,26 @@ function invent_method(
     )
 
     println("Running baseline suite: $baseline ...")
-    bas = run_method_report(baseline; seed=seed)
-    stamp_workflow_report!(bas; command="invent", baseline_name=nothing, scheme=DEFAULT_SCHEME)
+    bas = run_method_report(baseline; seed = seed)
+    stamp_workflow_report!(
+        bas;
+        command = "invent",
+        baseline_name = nothing,
+        scheme = DEFAULT_SCHEME,
+    )
     write_report(bas_path, bas)
 
     println("Running method suite: $method_name ...")
-    met = run_method_report(method_name; seed=seed)
-    stamp_workflow_report!(met; command="invent", baseline_name=baseline, scheme=DEFAULT_SCHEME)
+    met = run_method_report(method_name; seed = seed)
+    stamp_workflow_report!(
+        met;
+        command = "invent",
+        baseline_name = baseline,
+        scheme = DEFAULT_SCHEME,
+    )
     write_report(met_path, met)
 
-    cmp = classify_candidate(met, bas; δ=δ, vtk_produced=vtk_produced)
+    cmp = classify_candidate(met, bas; δ = δ, vtk_produced = vtk_produced)
     _attach_candidate_fields!(met, cmp)
     write_report(met_path, met)
     write_json_pretty(cmp_path, cmp)
@@ -132,17 +142,17 @@ function invent_method(
         met,
         bas,
         cmp;
-        append_log=append_log,
-        log_path=log_path,
-        yaml_path=yaml_path,
-        met_path=met_path,
-        bas_path=bas_path,
-        cmp_path=cmp_path,
-        hypothesis=hypothesis,
-        lessons=lessons,
-        strengths=strengths,
-        weaknesses=weaknesses,
-        git_ref=git_ref,
+        append_log = append_log,
+        log_path = log_path,
+        yaml_path = yaml_path,
+        met_path = met_path,
+        bas_path = bas_path,
+        cmp_path = cmp_path,
+        hypothesis = hypothesis,
+        lessons = lessons,
+        strengths = strengths,
+        weaknesses = weaknesses,
+        git_ref = git_ref,
     )
 
     return met, bas, cmp
@@ -156,13 +166,13 @@ Load two existing JSON reports and classify the method vs baseline.
 function score_reports(
     method_path::AbstractString,
     baseline_path::AbstractString;
-    δ::Real=DEFAULT_SCORE_MARGIN,
-    vtk_produced::Bool=false,
-    out_path::Union{Nothing,AbstractString}=nothing,
+    δ::Real = DEFAULT_SCORE_MARGIN,
+    vtk_produced::Bool = false,
+    out_path::Union{Nothing,AbstractString} = nothing,
 )
     met = load_report(method_path)
     bas = load_report(baseline_path)
-    cmp = classify_candidate(met, bas; δ=δ, vtk_produced=vtk_produced)
+    cmp = classify_candidate(met, bas; δ = δ, vtk_produced = vtk_produced)
     print_candidate_summary(get(met, "method_name", "method"), cmp)
     if out_path !== nothing
         write_json_pretty(out_path, cmp)

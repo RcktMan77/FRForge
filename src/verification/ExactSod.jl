@@ -17,13 +17,13 @@ struct SodProblem{T}
     x0::T
 end
 
-function SodProblem(; γ=1.4, x0=0.5, T::Type=Float64)
+function SodProblem(; γ = 1.4, x0 = 0.5, T::Type = Float64)
     return SodProblem{T}(T(1), T(0), T(1), T(0.125), T(0), T(0.1), T(γ), T(x0))
 end
 
 _cs(γ, ρ, p) = sqrt(γ * p / ρ)
 
-function sod_p_star(prob::SodProblem{T}; tol=T(1e-12), maxiter=60) where {T}
+function sod_p_star(prob::SodProblem{T}; tol = T(1e-12), maxiter = 60) where {T}
     γ = prob.γ
     ρL, uL, pL = prob.ρL, prob.uL, prob.pL
     ρR, uR, pR = prob.ρR, prob.uR, prob.pR

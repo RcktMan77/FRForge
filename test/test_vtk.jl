@@ -44,7 +44,7 @@ end
     mktempdir() do dir
         p = 2
         ops = build_operators(p)
-        mesh = Mesh1D(0.0, 1.0, 4; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+        mesh = Mesh1D(0.0, 1.0, 4; left_bc = PeriodicBC(), right_bc = PeriodicBC())
         state = allocate_state(mesh, ops, Val(1))
         set_initial_condition!(state, x -> sin(2π * x))
         eq = LinearAdvection1D(1.0)
@@ -70,7 +70,7 @@ end
         p = 2
         eq = Euler1D(1.4)
         ops = build_operators(p)
-        mesh = Mesh1D(0.0, 1.0, 3; left_bc=PeriodicBC(), right_bc=PeriodicBC())
+        mesh = Mesh1D(0.0, 1.0, 3; left_bc = PeriodicBC(), right_bc = PeriodicBC())
         state = allocate_state(mesh, ops, Val(3))
         set_initial_condition!(state, x -> euler_density_wave_conserved(eq, x, 0.0))
         path = joinpath(dir, "euler.vtu")
@@ -105,16 +105,16 @@ end
 @testset "2D VTU capturing diagnostics (docs path)" begin
     # Optional sensor/av fields — documentation only, not invent default
     c, state, eq = run_euler2d_riemann(;
-        p=1,
-        nx=6,
-        ny=6,
-        t_final=0.02,
-        cfl=0.05,
-        method=PerssonAVMethod(; c_av=0.1),
-        method_name="persson_av",
+        p = 1,
+        nx = 6,
+        ny = 6,
+        t_final = 0.02,
+        cfl = 0.05,
+        method = PerssonAVMethod(; c_av = 0.1),
+        method_name = "persson_av",
     )
     @test !c["diverged"]
-    method = PerssonAVMethod(; c_av=0.1)
+    method = PerssonAVMethod(; c_av = 0.1)
     σ, ε = compute_capturing_diagnostics_2d(state, eq, method)
     @test length(σ) == state.mesh.n_elements
     @test all(σ .>= 0)

@@ -9,8 +9,8 @@ const CLI_SCHEME_TIME_HELP = "Time integrator: ssp_rk3 (default) | ssp_rk2"
 """Parse SchemeConfig from a CLI options dict with points/flux/time keys."""
 function scheme_from_cli_opts(opts::AbstractDict)
     return parse_scheme(;
-        points=get(opts, "points", "gl"),
-        flux=get(opts, "flux", "rusanov"),
-        time=get(opts, "time", "ssp_rk3"),
+        points = get(opts, "points", "gl"),
+        flux = get(opts, "flux", "rusanov"),
+        time = get(opts, "time", "ssp_rk3"),
     )
 end

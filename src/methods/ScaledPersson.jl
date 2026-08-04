@@ -17,14 +17,14 @@ struct ScaledPerssonMethod{T} <: AbstractCapturingMethod
 end
 
 function ScaledPerssonMethod(;
-    κ::Real=4.0,
-    s0_factor::Real=-4.0,
-    c_av::Real=0.5,  # elevated vs baseline 0.1 so invent demo can clear δ=0.02
-    av_form::AbstractString="conservative_br0",
-    T::Type=Float64,
+    κ::Real = 4.0,
+    s0_factor::Real = -4.0,
+    c_av::Real = 0.5,  # elevated vs baseline 0.1 so invent demo can clear δ=0.02
+    av_form::AbstractString = "conservative_br0",
+    T::Type = Float64,
 )
     return ScaledPerssonMethod{T}(
-        PerssonAVMethod(; κ=κ, s0_factor=s0_factor, c_av=c_av, av_form=av_form, T=T),
+        PerssonAVMethod(; κ = κ, s0_factor = s0_factor, c_av = c_av, av_form = av_form, T = T),
     )
 end
 

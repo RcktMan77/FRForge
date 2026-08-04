@@ -2,8 +2,8 @@
 
 function _parse_test_args(args)
     s = ArgParseSettings(
-        description="Run FRForge verification and write a JSON report.",
-        prog="frforge test",
+        description = "Run FRForge verification and write a JSON report.",
+        prog = "frforge test",
     )
     @add_arg_table! s begin
         "--report", "-r"
@@ -75,7 +75,7 @@ function _dispatch_test_suite(suite::AbstractString, method::AbstractString)
         cases, overall_pass, hard_fails = run_m4_capturing_suite()
         return cases, overall_pass, hard_fails, "persson_av", true
     elseif suite in ("quant", "m5")
-        cases, overall_pass, hard_fails = run_m5_quant_suite(; method_name=method)
+        cases, overall_pass, hard_fails = run_m5_quant_suite(; method_name = method)
         return cases, overall_pass, hard_fails, method, true
     elseif suite in ("2d", "m8")
         cases, overall_pass, hard_fails, _, _ = run_m8_2d_suite()
@@ -97,7 +97,7 @@ function _dispatch_test_suite(suite::AbstractString, method::AbstractString)
         c2, p2, f2 = run_m2_burgers_suite()
         c3, p3, f3 = run_m3_euler_suite()
         c4, p4, f4 = run_m4_capturing_suite()
-        c5, p5, f5 = run_m5_quant_suite(; method_name=method)
+        c5, p5, f5 = run_m5_quant_suite(; method_name = method)
         c8, p8, f8, _, _ = run_m8_2d_suite()
         cases = vcat(c1, c2, c3, c4, c5, c8)
         hard_fails = vcat(f1, f2, f3, f4, f5, f8)
@@ -139,18 +139,18 @@ function _cli_test_body(opts::AbstractDict)
 
     report = write_report_skeleton(
         report_path;
-        command="test",
-        suite=suite,
-        method_name=method,
-        method_params=mparams,
-        baseline_name=nothing,
-        overall_pass=overall_pass,
-        diverged=diverged,
-        nan_detected=nan_detected,
-        wall_time_sec=time() - t0,
-        hard_gate_failures=hard_fails,
-        cases=cases,
-        scheme=scheme,
+        command = "test",
+        suite = suite,
+        method_name = method,
+        method_params = mparams,
+        baseline_name = nothing,
+        overall_pass = overall_pass,
+        diverged = diverged,
+        nan_detected = nan_detected,
+        wall_time_sec = time() - t0,
+        hard_gate_failures = hard_fails,
+        cases = cases,
+        scheme = scheme,
     )
 
     errs = validate_report_keys(report)

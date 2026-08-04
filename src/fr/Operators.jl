@@ -7,7 +7,7 @@
 Nodes are endpoints ±1 plus interior roots of ``P'_p`` where ``p = n-1``.
 Weights: ``w_i = 2 / (p(p+1) [P_p(ξ_i)]²)`` (then normalized to sum 2).
 """
-function gauss_lobatto_legendre_nodes_weights(n::Int; T::Type=Float64)
+function gauss_lobatto_legendre_nodes_weights(n::Int; T::Type = Float64)
     n >= 1 || throw(ArgumentError("n must be >= 1, got $n"))
     if n == 1
         return T[0], T[2]
@@ -82,14 +82,14 @@ and g_DG correction derivatives.
 
 `points`: `:gl` (Gauss–Legendre, default) or `:gll` (Gauss–Lobatto–Legendre).
 """
-function build_operators(p::Int; points::Symbol=:gl, T::Type=Float64)
+function build_operators(p::Int; points::Symbol = :gl, T::Type = Float64)
     p >= 0 || throw(ArgumentError("p must be >= 0"))
     points in (:gl, :gll) || throw(ArgumentError("points must be :gl or :gll, got $points"))
     Np = p + 1
     if points === :gl
-        ξ, w = gauss_legendre_nodes_weights(Np; T=T)
+        ξ, w = gauss_legendre_nodes_weights(Np; T = T)
     else
-        ξ, w = gauss_lobatto_legendre_nodes_weights(Np; T=T)
+        ξ, w = gauss_lobatto_legendre_nodes_weights(Np; T = T)
     end
     D = differentiation_matrix(ξ)
     ℓ_L = lagrange_at(ξ, -one(T))
@@ -99,8 +99,8 @@ function build_operators(p::Int; points::Symbol=:gl, T::Type=Float64)
     return FROperators{T}(p, points, ξ, w, D, ℓ_L, ℓ_R, gL_ξ, gR_ξ, gL, gR, V)
 end
 
-build_operators(p::Int, scheme::SchemeConfig; T::Type=Float64) =
-    build_operators(p; points=scheme.points, T=T)
+build_operators(p::Int, scheme::SchemeConfig; T::Type = Float64) =
+    build_operators(p; points = scheme.points, T = T)
 
 """Number of solution points per element."""
 n_points(ops::FROperators) = length(ops.ξ)

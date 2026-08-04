@@ -34,7 +34,7 @@ True if every finite observed order q satisfies q >= formal_order - tol.
 function order_pass(
     observed::AbstractVector;
     formal_order::Real,
-    tol::Real=DEFAULT_ORDER_TOLERANCE,
+    tol::Real = DEFAULT_ORDER_TOLERANCE,
 )
     isempty(observed) && return false
     for q in observed
@@ -61,7 +61,7 @@ end
 conservation_residual_absolute(M0, MT) = abs(MT - M0)
 
 """Min/max of solution field (component `c`)."""
-function solution_extrema(state::SolutionState, c::Int=1)
+function solution_extrema(state::SolutionState, c::Int = 1)
     umin = typemax(eltype(state.u))
     umax = typemin(eltype(state.u))
     @inbounds for e in 1:size(state.u, 2), j in 1:size(state.u, 1)
@@ -92,7 +92,7 @@ end
 Collect all solution-point samples sorted by physical x.
 `component` is `:density`, `:velocity`, `:pressure`, or an Int conserved index.
 """
-function sample_solution_1d(state::SolutionState{T}, eq; component=:density) where {T}
+function sample_solution_1d(state::SolutionState{T}, eq; component = :density) where {T}
     mesh, ops = state.mesh, state.ops
     Np, Nel = size(state.u, 1), size(state.u, 2)
     n = Np * Nel
@@ -138,9 +138,9 @@ If jump bounds are not given, uses global min/max of ρ.
 function shock_thickness_sp(
     x::AbstractVector,
     ρ::AbstractVector;
-    jump_lo=nothing,
-    jump_hi=nothing,
-    window_sp::Int=30,
+    jump_lo = nothing,
+    jump_hi = nothing,
+    window_sp::Int = 30,
 )
     n = length(x)
     n < 4 && return NaN
@@ -209,7 +209,7 @@ function excess_dissipation(
     x::AbstractVector,
     u_method::AbstractVector,
     u_ref::AbstractVector;
-    mask::Union{Nothing,AbstractVector{Bool}}=nothing,
+    mask::Union{Nothing,AbstractVector{Bool}} = nothing,
 )
     n = length(u_method)
     num = 0.0
@@ -228,8 +228,8 @@ Smooth-region mask: |∂ρ/∂x| below fraction of max gradient, optionally excl
 function smooth_region_mask(
     x::AbstractVector,
     ρ::AbstractVector;
-    grad_frac::Float64=0.1,
-    exclude_windows::Vector{Tuple{Float64,Float64}}=Tuple{Float64,Float64}[],
+    grad_frac::Float64 = 0.1,
+    exclude_windows::Vector{Tuple{Float64,Float64}} = Tuple{Float64,Float64}[],
 )
     n = length(x)
     mask = trues(n)

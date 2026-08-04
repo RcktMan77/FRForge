@@ -10,7 +10,7 @@ struct Euler1D{T} <: AbstractEquation{3}
     γ::T
 end
 
-Euler1D(γ::Real=1.4) = Euler1D{typeof(float(γ))}(float(γ))
+Euler1D(γ::Real = 1.4) = Euler1D{typeof(float(γ))}(float(γ))
 Euler1D{T}() where {T} = Euler1D{T}(T(1.4))
 
 # --- Primitive / conserved conversions ---
@@ -59,17 +59,17 @@ function conserved_to_primitives(eq::Euler1D{T}, U::AbstractVector) where {T}
 end
 
 """Positivity: ρ > 0 and p > 0 for a single conserved state."""
-function positivity_ok_state(eq::Euler1D{T}, U::AbstractVector; atol=zero(T)) where {T}
+function positivity_ok_state(eq::Euler1D{T}, U::AbstractVector; atol = zero(T)) where {T}
     ρ = U[1]
     p = pressure(eq, U)
     return ρ > atol && p > atol && isfinite(ρ) && isfinite(p)
 end
 
 """Positivity over a 3D solution array u[j,e,c]."""
-function positivity_ok(eq::Euler1D{T}, u::AbstractArray{T,3}; atol=zero(T)) where {T}
+function positivity_ok(eq::Euler1D{T}, u::AbstractArray{T,3}; atol = zero(T)) where {T}
     Np, Nel = size(u, 1), size(u, 2)
     @inbounds for e in 1:Nel, j in 1:Np
-        if !positivity_ok_state(eq, @view(u[j, e, :]); atol=atol)
+        if !positivity_ok_state(eq, @view(u[j, e, :]); atol = atol)
             return false
         end
     end
@@ -119,4 +119,3 @@ end
 function numerical_flux(eq::Euler1D, uL::AbstractVector, uR::AbstractVector)
     return rusanov_flux(eq, uL, uR)
 end
-

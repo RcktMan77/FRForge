@@ -35,7 +35,7 @@ end
 Return `name` as `String`, or throw with the registered-method list.
 Internal helper for CLI / invent / confirm entry points.
 """
-function require_registered_method(name::AbstractString; role::AbstractString="method")
+function require_registered_method(name::AbstractString; role::AbstractString = "method")
     key = String(name)
     haskey(METHOD_REGISTRY, key) ||
         error("Unknown $role \"$key\". $(describe_methods())")

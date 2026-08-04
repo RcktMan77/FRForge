@@ -35,7 +35,7 @@ const CLI_RUN_CASE_HELP = "Case: " * join(CLI_RUN_CASES, "|")
 const CLI_LOG_SUBCOMMANDS = ("list", "summary", "frontier", "lessons", "show", "pareto", "append")
 const CLI_SNAPSHOT_SUBCOMMANDS = ("freeze", "verify", "tables")
 
-function _print_usage(io=stderr)
+function _print_usage(io = stderr)
     println(io, "FRForge — high-order Flux Reconstruction laboratory")
     println(io, "Usage: frforge {$(join(CLI_COMMANDS, "|"))} [options]")
     println(io)
@@ -49,7 +49,10 @@ function _print_usage(io=stderr)
     println(io, "  snapshot     Freeze/verify/tables for reproducibility packages")
     println(io, "  robustness   Scheme robustness matrix (CI-light or full/nightly)")
     println(io)
-    println(io, "Agent workflow: invent (coarse) → log frontier → confirm (fine) → snapshot freeze.")
+    println(
+        io,
+        "Agent workflow: invent (coarse) → log frontier → confirm (fine) → snapshot freeze.",
+    )
     println(
         io,
         "Frozen invent scheme: $(FROZEN_INVENT_SCHEME.points) + $(FROZEN_INVENT_SCHEME.flux) + $(FROZEN_INVENT_SCHEME.time)",
@@ -57,7 +60,10 @@ function _print_usage(io=stderr)
     println(io, "Official invent/confirm/scoring use serial residual (bit-deterministic).")
     println(io)
     println(io, "Examples:")
-    println(io, "  frforge test --suite quant --method persson_av --report results/quant/report.json")
+    println(
+        io,
+        "  frforge test --suite quant --method persson_av --report results/quant/report.json",
+    )
     println(io, "  frforge invent --method scaled_persson --baseline persson_av")
     println(io, "  frforge confirm --method scaled_persson --baseline persson_av")
     println(io, "  frforge confirm --method scaled_persson --preset quick   # smoke")
@@ -71,4 +77,3 @@ function _print_usage(io=stderr)
     println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
     println(io, describe_methods())
 end
-

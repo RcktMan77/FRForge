@@ -19,11 +19,11 @@ end
 
 @testset "entry format and append" begin
     bas = FRForge.report_skeleton(;
-        command="invent",
-        suite="quant",
-        method_name="persson_av",
-        overall_pass=true,
-        cases=Any[
+        command = "invent",
+        suite = "quant",
+        method_name = "persson_av",
+        overall_pass = true,
+        cases = Any[
             Dict(
                 "name" => "euler_smooth_order_p2",
                 "case_type" => "smooth_order",
@@ -61,7 +61,7 @@ end
                 "metrics" => Dict{String,Any}(),
             ),
         ],
-        fill_scores=true,
+        fill_scores = true,
     )
     met = deepcopy(bas)
     met["method_name"] = "toy_method"
@@ -71,18 +71,18 @@ end
     met["cases"][2]["overshoot"] = 0.01
     met["cases"][2]["shock_thickness"] = 3.0
     met["summary"]["scores"] = score_suite_absolute(met["cases"])
-    cmp = classify_candidate(met, bas; δ=0.02, vtk_produced=false)
+    cmp = classify_candidate(met, bas; δ = 0.02, vtk_produced = false)
 
     entry = entry_from_invent(
         "toy_method",
         met,
         bas,
         cmp;
-        hypothesis="Test hypothesis for log unit test.",
-        lessons="Test lessons for log unit test.",
-        artifacts=Dict("method_report" => "tmp/method.json"),
-        entry_id="testdate-toy_method-unit",
-        date=Date(2026, 8, 3),
+        hypothesis = "Test hypothesis for log unit test.",
+        lessons = "Test lessons for log unit test.",
+        artifacts = Dict("method_report" => "tmp/method.json"),
+        entry_id = "testdate-toy_method-unit",
+        date = Date(2026, 8, 3),
     )
     @test entry["id"] == "testdate-toy_method-unit"
     @test entry["scheme"]["points"] == "GL"
@@ -97,7 +97,7 @@ end
         write(logp, "# Test log\n\n## Entries\n\n")
         ymlp = joinpath(dir, "experiment_log.yaml")
         write(ymlp, "entries:\n")
-        append_experiment_entry!(logp, entry; yaml_path=ymlp)
+        append_experiment_entry!(logp, entry; yaml_path = ymlp)
         ids = list_experiment_entry_ids(logp)
         @test "testdate-toy_method-unit" in ids
         body = read(logp, String)
@@ -112,7 +112,7 @@ end
             # still test entry_from_invent with fake promising status
             cmp_p["candidate_status"] = "promising"
         end
-        e2 = entry_from_invent("toy_method", met, bas, cmp_p; entry_id="x-promising")
+        e2 = entry_from_invent("toy_method", met, bas, cmp_p; entry_id = "x-promising")
         @test e2["narrative_complete"] == false || (
             e2["hypothesis"] != FRForge.NARRATIVE_PLACEHOLDER &&
             e2["lessons"] != FRForge.NARRATIVE_PLACEHOLDER
@@ -122,14 +122,14 @@ end
             met,
             bas,
             cmp_p;
-            entry_id="x-promising-full",
-            hypothesis="",
-            lessons="",
+            entry_id = "x-promising-full",
+            hypothesis = "",
+            lessons = "",
         )
         # status forced promising → placeholders
         cmp_p2 = Dict{String,Any}(cmp)
         cmp_p2["candidate_status"] = "promising"
-        e4 = entry_from_invent("toy_method", met, bas, cmp_p2; entry_id="x4")
+        e4 = entry_from_invent("toy_method", met, bas, cmp_p2; entry_id = "x4")
         @test e4["hypothesis"] == FRForge.NARRATIVE_PLACEHOLDER
         @test e4["lessons"] == FRForge.NARRATIVE_PLACEHOLDER
         @test e4["narrative_complete"] == false

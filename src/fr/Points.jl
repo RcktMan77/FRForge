@@ -7,7 +7,7 @@
 Return `n` Gauss–Legendre nodes and weights on the reference interval `[-1, 1]`.
 Uses the Golub–Welsch eigenvalue algorithm (symmetric Jacobi matrix).
 """
-function gauss_legendre_nodes_weights(n::Int; T::Type=Float64)
+function gauss_legendre_nodes_weights(n::Int; T::Type = Float64)
     n >= 1 || throw(ArgumentError("n must be >= 1, got $n"))
     if n == 1
         return T[0], T[2]

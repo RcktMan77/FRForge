@@ -12,7 +12,12 @@ struct PerssonSensor{T} <: AbstractShockSensor
     ε_floor::T
 end
 
-function PerssonSensor(; κ::Real=4.0, s0_factor::Real=-4.0, ε_floor::Real=1e-16, T::Type=Float64)
+function PerssonSensor(;
+    κ::Real = 4.0,
+    s0_factor::Real = -4.0,
+    ε_floor::Real = 1e-16,
+    T::Type = Float64,
+)
     return PerssonSensor{T}(T(κ), T(s0_factor), T(ε_floor))
 end
 
@@ -32,9 +37,9 @@ struct ElementArtificialViscosity{T} <: AbstractDissipationOperator
 end
 
 function ElementArtificialViscosity(;
-    c_av::Real=0.1,
-    av_form::AbstractString="conservative_br0",
-    T::Type=Float64,
+    c_av::Real = 0.1,
+    av_form::AbstractString = "conservative_br0",
+    T::Type = Float64,
 )
     return ElementArtificialViscosity{T}(T(c_av), String(av_form))
 end
@@ -51,24 +56,24 @@ struct PerssonAVMethod{T} <: AbstractCapturingMethod
 end
 
 function PerssonAVMethod(;
-    κ::Real=4.0,
-    s0_factor::Real=-4.0,
-    c_av::Real=0.1,
-    av_form::AbstractString="conservative_br0",
-    T::Type=Float64,
+    κ::Real = 4.0,
+    s0_factor::Real = -4.0,
+    c_av::Real = 0.1,
+    av_form::AbstractString = "conservative_br0",
+    T::Type = Float64,
 )
     return PerssonAVMethod{T}(
-        PerssonSensor(; κ=κ, s0_factor=s0_factor, T=T),
-        ElementArtificialViscosity(; c_av=c_av, av_form=av_form, T=T),
+        PerssonSensor(; κ = κ, s0_factor = s0_factor, T = T),
+        ElementArtificialViscosity(; c_av = c_av, av_form = av_form, T = T),
     )
 end
 
 # c_av=0.1 is the explicit-RK-friendly scored default (0.5 can stiffen BR0).
 default_persson_params() = (
-    κ=4.0,
-    s0_factor=-4.0,
-    c_av=0.1,
-    av_form="conservative_br0",
+    κ = 4.0,
+    s0_factor = -4.0,
+    c_av = 0.1,
+    av_form = "conservative_br0",
 )
 
 function method_params(m::PerssonAVMethod)
@@ -361,12 +366,12 @@ end
 Mass residual of viscous operator on a constant field (should be ~0).
 Uses one residual evaluation with σ≡1, constant u.
 """
-function viscous_mass_residual_scale(ops::FROperators{T}, mesh::Mesh1D{T}; p=ops.p) where {T}
+function viscous_mass_residual_scale(ops::FROperators{T}, mesh::Mesh1D{T}; p = ops.p) where {T}
     # Constant state → gradients zero → BR0 residual zero
     state = allocate_state(mesh, ops, Val(1))
     fill!(state.u, one(T))
     eq = Burgers1D()
-    dissip = ElementArtificialViscosity(; c_av=1.0, av_form="conservative_br0", T=T)
+    dissip = ElementArtificialViscosity(; c_av = 1.0, av_form = "conservative_br0", T = T)
     σ = ones(T, mesh.n_elements)
     du = zeros(T, size(state.u)...)
     apply_dissipation!(du, dissip, σ, state.u, state, eq)

@@ -7,7 +7,10 @@ function _parse_log_args(args)
     sub = args[1]
     rest = args[2:end]
     if sub == "list"
-        s = ArgParseSettings(description="List experiment log entry ids.", prog="frforge log list")
+        s = ArgParseSettings(
+            description = "List experiment log entry ids.",
+            prog = "frforge log list",
+        )
         @add_arg_table! s begin
             "--path"
             help = "Path to experiment_log.md"
@@ -17,7 +20,10 @@ function _parse_log_args(args)
         opts["sub"] = "list"
         return opts
     elseif sub == "summary"
-        s = ArgParseSettings(description="Summarize experiment log.", prog="frforge log summary")
+        s = ArgParseSettings(
+            description = "Summarize experiment log.",
+            prog = "frforge log summary",
+        )
         @add_arg_table! s begin
             "--path"
             help = "Path to experiment_log.md"
@@ -30,7 +36,10 @@ function _parse_log_args(args)
         opts["sub"] = "summary"
         return opts
     elseif sub == "frontier"
-        s = ArgParseSettings(description="Frontier / near-miss methods.", prog="frforge log frontier")
+        s = ArgParseSettings(
+            description = "Frontier / near-miss methods.",
+            prog = "frforge log frontier",
+        )
         @add_arg_table! s begin
             "--path"
             default = ""
@@ -41,7 +50,10 @@ function _parse_log_args(args)
         opts["sub"] = "frontier"
         return opts
     elseif sub == "lessons"
-        s = ArgParseSettings(description="Index of lessons and weaknesses.", prog="frforge log lessons")
+        s = ArgParseSettings(
+            description = "Index of lessons and weaknesses.",
+            prog = "frforge log lessons",
+        )
         @add_arg_table! s begin
             "--path"
             default = ""
@@ -55,7 +67,7 @@ function _parse_log_args(args)
         opts["sub"] = "lessons"
         return opts
     elseif sub == "show"
-        s = ArgParseSettings(description="Show one log entry by id.", prog="frforge log show")
+        s = ArgParseSettings(description = "Show one log entry by id.", prog = "frforge log show")
         @add_arg_table! s begin
             "id"
             help = "Entry id (### heading)"
@@ -69,7 +81,10 @@ function _parse_log_args(args)
         opts["sub"] = "show"
         return opts
     elseif sub == "pareto"
-        s = ArgParseSettings(description="Pareto-style order/dissip/shock table.", prog="frforge log pareto")
+        s = ArgParseSettings(
+            description = "Pareto-style order/dissip/shock table.",
+            prog = "frforge log pareto",
+        )
         @add_arg_table! s begin
             "--path"
             default = ""
@@ -81,8 +96,8 @@ function _parse_log_args(args)
         return opts
     elseif sub == "append"
         s = ArgParseSettings(
-            description="Append experiment log entry from two invent JSON reports.",
-            prog="frforge log append",
+            description = "Append experiment log entry from two invent JSON reports.",
+            prog = "frforge log append",
         )
         @add_arg_table! s begin
             "--method-report"
@@ -171,7 +186,7 @@ function cli_log(args)
     elseif sub == "lessons"
         entries = parse_experiment_log(_log_path(opts))
         q = get(opts, "query", "")
-        rows = log_lessons(entries; query=isempty(q) ? nothing : q)
+        rows = log_lessons(entries; query = isempty(q) ? nothing : q)
         print(format_log_lessons_text(rows))
         _maybe_write_json(get(opts, "json", ""), rows)
         return 0
@@ -189,7 +204,7 @@ function cli_log(args)
         path = _log_path(opts)
         met = load_report(opts["method_report"])
         bas = load_report(opts["baseline_report"])
-        cmp = classify_candidate(met, bas; δ=opts["delta"], vtk_produced=opts["vtk_produced"])
+        cmp = classify_candidate(met, bas; δ = opts["delta"], vtk_produced = opts["vtk_produced"])
         method_name = string(get(met, "method_name", "method"))
         arts = Dict{String,Any}(
             "method_report" => opts["method_report"],
@@ -200,11 +215,11 @@ function cli_log(args)
             met,
             bas,
             cmp;
-            log_path=path,
-            yaml_path=nothing,
-            artifacts=arts,
-            hypothesis=opts["hypothesis"],
-            lessons=opts["lessons"],
+            log_path = path,
+            yaml_path = nothing,
+            artifacts = arts,
+            hypothesis = opts["hypothesis"],
+            lessons = opts["lessons"],
         )
         println("Appended $(entry["id"]) → $path")
         return 0
@@ -214,4 +229,3 @@ function cli_log(args)
         return 2
     end
 end
-

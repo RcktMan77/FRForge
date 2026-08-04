@@ -13,11 +13,11 @@ end
 
 @testset "classify_candidate statuses" begin
     bas = FRForge.report_skeleton(;
-        command="invent",
-        suite="quant",
-        method_name="persson_av",
-        overall_pass=true,
-        cases=Any[
+        command = "invent",
+        suite = "quant",
+        method_name = "persson_av",
+        overall_pass = true,
+        cases = Any[
             Dict(
                 "name" => "euler_smooth_order_p2",
                 "case_type" => "smooth_order",
@@ -55,7 +55,7 @@ end
                 "metrics" => Dict{String,Any}(),
             ),
         ],
-        fill_scores=true,
+        fill_scores = true,
     )
     # Better method: lower excess dissip and overshoot
     met = deepcopy(bas)
@@ -66,12 +66,12 @@ end
     met["cases"][2]["shock_thickness"] = 3.0
     met["summary"]["scores"] = score_suite_absolute(met["cases"])
 
-    cmp = classify_candidate(met, bas; δ=0.02, vtk_produced=false)
+    cmp = classify_candidate(met, bas; δ = 0.02, vtk_produced = false)
     @test cmp["candidate_status"] in ("promising", "pass_gates", "accepted_candidate")
     @test cmp["composite_margin"] > 0
     @test cmp["tradeoff_ok"]
 
-    cmp2 = classify_candidate(met, bas; δ=0.02, vtk_produced=true)
+    cmp2 = classify_candidate(met, bas; δ = 0.02, vtk_produced = true)
     if cmp["candidate_status"] == "promising"
         @test cmp2["candidate_status"] == "accepted_candidate"
     end
@@ -87,30 +87,30 @@ end
 @testset "score_reports round-trip" begin
     mktempdir() do dir
         bas = FRForge.report_skeleton(;
-            method_name="persson_av",
-            overall_pass=true,
-            cases=Any[
+            method_name = "persson_av",
+            overall_pass = true,
+            cases = Any[
                 Dict(
-                    "name" => "sod_base",
-                    "case_type" => "discontinuous",
-                    "excess_dissipation" => 0.1,
-                    "shock_thickness" => 6.0,
-                    "overshoot" => 0.08,
-                    "diverged" => false,
-                    "nan_detected" => false,
-                    "positivity_ok" => true,
-                    "equation" => "euler1d",
-                    "p" => 2,
-                    "capturing_method" => "persson_av",
-                    "pass" => true,
-                    "conservation_residual" => 0.0,
-                    "conservation_pass" => true,
-                    "conservation_metric" => "none",
-                    "wall_time_sec" => 0.0,
-                    "metrics" => Dict{String,Any}(),
-                ),
+                "name" => "sod_base",
+                "case_type" => "discontinuous",
+                "excess_dissipation" => 0.1,
+                "shock_thickness" => 6.0,
+                "overshoot" => 0.08,
+                "diverged" => false,
+                "nan_detected" => false,
+                "positivity_ok" => true,
+                "equation" => "euler1d",
+                "p" => 2,
+                "capturing_method" => "persson_av",
+                "pass" => true,
+                "conservation_residual" => 0.0,
+                "conservation_pass" => true,
+                "conservation_metric" => "none",
+                "wall_time_sec" => 0.0,
+                "metrics" => Dict{String,Any}(),
+            ),
             ],
-            fill_scores=true,
+            fill_scores = true,
         )
         met = deepcopy(bas)
         met["method_name"] = "scaled_persson"
@@ -121,9 +121,8 @@ end
         mp = joinpath(dir, "m.json")
         write_report(bp, bas)
         write_report(mp, met)
-        cmp = score_reports(mp, bp; δ=0.01)
+        cmp = score_reports(mp, bp; δ = 0.01)
         @test haskey(cmp, "candidate_status")
         @test cmp["composite"] > cmp["baseline_composite"]
     end
 end
-

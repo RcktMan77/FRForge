@@ -7,7 +7,11 @@ Local Lax–Friedrichs:
   f̂ = ½(F(u⁻)+F(u⁺)) − ½ λ_max (u⁺ − u⁻)
 with λ_max from `max_wave_speed(eq, uL, uR)`.
 """
-function rusanov_flux(eq::AbstractEquation{Neq}, uL::AbstractVector{T}, uR::AbstractVector{T}) where {T,Neq}
+function rusanov_flux(
+    eq::AbstractEquation{Neq},
+    uL::AbstractVector{T},
+    uR::AbstractVector{T},
+) where {T,Neq}
     fL = physical_flux(eq, uL)
     fR = physical_flux(eq, uR)
     λ = max_wave_speed(eq, uL, uR)

@@ -11,7 +11,7 @@ Equispaced reference nodes on [-1,1] in **VTK Lagrange line order**:
 1. vertices ξ=-1, ξ=+1
 2. edge interiors left→right: ξ = -1 + 2k/p for k=1..p-1
 """
-function vtk_lagrange_line_nodes(p::Int; T::Type=Float64)
+function vtk_lagrange_line_nodes(p::Int; T::Type = Float64)
     p >= 0 || throw(ArgumentError("p must be >= 0"))
     if p == 0
         return T[0]
@@ -32,13 +32,13 @@ Interpolation matrix I such that u_equi = I * u_GL,
 mapping GL solution-point values to VTK equispaced Lagrange nodes.
 """
 function gl_to_equi_interp(ops::FROperators{T}) where {T}
-    ξ_equi = vtk_lagrange_line_nodes(ops.p; T=T)
+    ξ_equi = vtk_lagrange_line_nodes(ops.p; T = T)
     return lagrange_basis_matrix(ops.ξ, ξ_equi)
 end
 
 """Physical coordinates of VTK Lagrange nodes for element `e` (in VTK order)."""
 function vtk_physical_nodes_1d(mesh::Mesh1D{T}, ops::FROperators{T}, e::Int) where {T}
-    ξ = vtk_lagrange_line_nodes(ops.p; T=T)
+    ξ = vtk_lagrange_line_nodes(ops.p; T = T)
     xL = mesh.x_vertices[e]
     xR = mesh.x_vertices[e + 1]
     mid = (xL + xR) / T(2)
@@ -61,7 +61,7 @@ function write_vtu_high_order(
     path::AbstractString,
     state::SolutionState{T,Neq},
     eq;
-    fields::Symbol=:auto,
+    fields::Symbol = :auto,
 ) where {T,Neq}
     endswith(lowercase(path), ".vtu") ||
         @warn "VTK high-order writer produces .vtu; path does not end in .vtu" path
@@ -136,7 +136,10 @@ function write_vtu_high_order(
     mkpath(dirname(abspath(path)))
     open(path, "w") do io
         println(io, "<?xml version=\"1.0\"?>")
-        println(io, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">")
+        println(
+            io,
+            "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">",
+        )
         println(io, "  <UnstructuredGrid>")
         println(io, "    <Piece NumberOfPoints=\"$n_points\" NumberOfCells=\"$n_cells\">")
 
@@ -147,7 +150,15 @@ function write_vtu_high_order(
             "        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">",
         )
         for i in 1:n_points
-            print(io, "          ", Float64(coords[1, i]), " ", Float64(coords[2, i]), " ", Float64(coords[3, i]))
+            print(
+                io,
+                "          ",
+                Float64(coords[1, i]),
+                " ",
+                Float64(coords[2, i]),
+                " ",
+                Float64(coords[3, i]),
+            )
             println(io)
         end
         println(io, "        </DataArray>")
@@ -243,7 +254,7 @@ function parse_vtu_basic(path::AbstractString)
             push!(conn, parse(Int, tok))
         end
     end
-    return (n_points=n_points, n_cells=n_cells, types=types, connectivity=conn, text=txt)
+    return (n_points = n_points, n_cells = n_cells, types = types, connectivity = conn, text = txt)
 end
 
 # ---------------------------------------------------------------------------
@@ -256,7 +267,7 @@ end
 Reference (ξ,η) nodes on [-1,1]² in VTK Lagrange quad order:
 corners, then edge interiors (bottom, right, top, left), then face interior.
 """
-function vtk_lagrange_quad_nodes(p::Int; T::Type=Float64)
+function vtk_lagrange_quad_nodes(p::Int; T::Type = Float64)
     p >= 1 || throw(ArgumentError("p >= 1 for quads"))
     nodes = NTuple{2,T}[]
     # corners: SW, SE, NE, NW
@@ -315,13 +326,13 @@ function write_vtu_high_order(
     path::AbstractString,
     state::SolutionState2D{T,Neq},
     eq;
-    fields::Symbol=:auto,
-    cell_fields::Union{Nothing,AbstractDict}=nothing,
-    point_fields::Union{Nothing,AbstractDict}=nothing,
+    fields::Symbol = :auto,
+    cell_fields::Union{Nothing,AbstractDict} = nothing,
+    point_fields::Union{Nothing,AbstractDict} = nothing,
 ) where {T,Neq}
     mesh, ops = state.mesh, state.ops
     p = ops.p
-    nodes_ref = vtk_lagrange_quad_nodes(p; T=T)
+    nodes_ref = vtk_lagrange_quad_nodes(p; T = T)
     n_per = length(nodes_ref)
     Nel = mesh.n_elements
     n_pts = Nel * n_per
@@ -409,13 +420,27 @@ function write_vtu_high_order(
     mkpath(dirname(abspath(path)))
     open(path, "w") do io
         println(io, "<?xml version=\"1.0\"?>")
-        println(io, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">")
+        println(
+            io,
+            "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">",
+        )
         println(io, "  <UnstructuredGrid>")
         println(io, "    <Piece NumberOfPoints=\"$n_pts\" NumberOfCells=\"$n_cells\">")
         println(io, "      <Points>")
-        println(io, "        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">")
+        println(
+            io,
+            "        <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">",
+        )
         for i in 1:n_pts
-            println(io, "          ", Float64(coords[1, i]), " ", Float64(coords[2, i]), " ", Float64(coords[3, i]))
+            println(
+                io,
+                "          ",
+                Float64(coords[1, i]),
+                " ",
+                Float64(coords[2, i]),
+                " ",
+                Float64(coords[3, i]),
+            )
         end
         println(io, "        </DataArray>")
         println(io, "      </Points>")
@@ -544,6 +569,6 @@ function write_vtu_high_order_with_capturing(
         path,
         state,
         eq;
-        cell_fields=Dict{String,Any}("sensor" => σ, "av" => ε),
+        cell_fields = Dict{String,Any}("sensor" => σ, "av" => ε),
     )
 end

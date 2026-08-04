@@ -7,7 +7,7 @@
 
 Top-level CLI dispatcher. Returns a process exit code.
 """
-function main_cli(args=ARGS)
+function main_cli(args = ARGS)
     if isempty(args) || args[1] in ("-h", "--help", "help")
         _print_usage()
         return isempty(args) ? 2 : 0

@@ -25,17 +25,17 @@ end
 - `:full` — product of GL/GLL × Rusanov/HLLC × SSP-RK3/SSP-RK2 (8 cells)
 - `:ci` — default scheme + one hard corner (GLL × HLLC × SSP-RK3)
 """
-function robustness_cells(matrix::Symbol=:full)
+function robustness_cells(matrix::Symbol = :full)
     if matrix === :full
         cells = SchemeConfig[]
         for p in ROBUSTNESS_POINTS, f in ROBUSTNESS_FLUXES, t in ROBUSTNESS_TIMES
-            push!(cells, SchemeConfig(; points=p, flux=f, time=t))
+            push!(cells, SchemeConfig(; points = p, flux = f, time = t))
         end
         return cells
     elseif matrix === :ci
         return [
             DEFAULT_SCHEME,
-            SchemeConfig(; points=:gll, flux=:hllc, time=:ssp_rk3),
+            SchemeConfig(; points = :gll, flux = :hllc, time = :ssp_rk3),
         ]
     else
         error("Unknown matrix kind $matrix (use :full or :ci)")
@@ -74,15 +74,15 @@ function evaluate_robustness_cell(
     method_name::AbstractString,
     baseline_name::AbstractString,
     scheme::SchemeConfig;
-    light::Bool=false,
-    δ::Real=DEFAULT_SCORE_MARGIN,
-    vtk_produced::Bool=false,
+    light::Bool = false,
+    δ::Real = DEFAULT_SCORE_MARGIN,
+    vtk_produced::Bool = false,
 )
     suite = light ? :light : :quant
     t0 = time()
-    met = run_method_report(method_name; suite=suite, scheme=scheme)
-    bas = run_method_report(baseline_name; suite=suite, scheme=scheme)
-    cmp = classify_candidate(met, bas; δ=δ, vtk_produced=vtk_produced)
+    met = run_method_report(method_name; suite = suite, scheme = scheme)
+    bas = run_method_report(baseline_name; suite = suite, scheme = scheme)
+    cmp = classify_candidate(met, bas; δ = δ, vtk_produced = vtk_produced)
     ok = cell_ok(met)
     ord = order_preserved(met)
     cell_status = if !ok
@@ -133,9 +133,9 @@ Does **not** auto-promote; returns an assessment for the log / agents.
 """
 function assess_publication_grade(
     cells::AbstractVector;
-    narrative_complete::Bool=false,
-    invent_status::Union{Nothing,AbstractString}=nothing,
-    confirm_passed::Bool=false,
+    narrative_complete::Bool = false,
+    invent_status::Union{Nothing,AbstractString} = nothing,
+    confirm_passed::Bool = false,
 )
     rules = Dict{String,Any}[]
     default_cells = filter(c -> _is_default_scheme(c), cells)
@@ -151,8 +151,7 @@ function assess_publication_grade(
         r1_ok =
             get(dc, "ok", false) === true &&
             (status in PROMOTION_INVENT_STATUSES || status == "publication_grade")
-        r1_notes =
-            "default cell_status=$(get(dc, "cell_status", "?")) invent_status=$status ok=$(get(dc, "ok", false))"
+        r1_notes = "default cell_status=$(get(dc, "cell_status", "?")) invent_status=$status ok=$(get(dc, "ok", false))"
     end
     push!(
         rules,
@@ -165,14 +164,16 @@ function assess_publication_grade(
 
     # Rule 2: HLLC
     r2_ok = isempty(hllc_cells) ? false : all(c -> get(c, "ok", false) === true, hllc_cells)
-    r2_notes = isempty(hllc_cells) ? "no HLLC cells" :
-               "hllc_ok=$(count(c -> get(c, "ok", false) === true, hllc_cells))/$(length(hllc_cells))"
+    r2_notes =
+        isempty(hllc_cells) ? "no HLLC cells" :
+        "hllc_ok=$(count(c -> get(c, "ok", false) === true, hllc_cells))/$(length(hllc_cells))"
     push!(rules, Dict("id" => "hllc_robust", "ok" => r2_ok, "notes" => r2_notes))
 
     # Rule 3: GLL
     r3_ok = isempty(gll_cells) ? false : all(c -> get(c, "ok", false) === true, gll_cells)
-    r3_notes = isempty(gll_cells) ? "no GLL cells" :
-               "gll_ok=$(count(c -> get(c, "ok", false) === true, gll_cells))/$(length(gll_cells))"
+    r3_notes =
+        isempty(gll_cells) ? "no GLL cells" :
+        "gll_ok=$(count(c -> get(c, "ok", false) === true, gll_cells))/$(length(gll_cells))"
     push!(rules, Dict("id" => "gll_stable", "ok" => r3_ok, "notes" => r3_notes))
 
     # Rule 4: narrative
@@ -181,7 +182,9 @@ function assess_publication_grade(
         Dict(
             "id" => "narrative_complete",
             "ok" => narrative_complete,
-            "notes" => narrative_complete ? "hypothesis+lessons provided" : "hypothesis/lessons incomplete",
+            "notes" =>
+                narrative_complete ? "hypothesis+lessons provided" :
+                "hypothesis/lessons incomplete",
         ),
     )
 
@@ -191,9 +194,10 @@ function assess_publication_grade(
         Dict(
             "id" => "fine_mesh_confirm",
             "ok" => confirm_passed,
-            "notes" => confirm_passed ?
-                       "frforge confirm passed (confirmed)" :
-                       "missing fine-mesh confirm — run frforge confirm after short-list",
+            "notes" =>
+                confirm_passed ?
+                "frforge confirm passed (confirmed)" :
+                "missing fine-mesh confirm — run frforge confirm after short-list",
         ),
     )
 
@@ -240,17 +244,17 @@ Evaluate all cells, write per-cell JSON + summary, optionally append experiment 
 """
 function run_robustness_matrix(
     method_name::AbstractString;
-    baseline::AbstractString="persson_av",
-    matrix::Symbol=:ci,
-    report_dir::AbstractString="results/robustness",
-    light::Union{Nothing,Bool}=nothing,
-    δ::Real=DEFAULT_SCORE_MARGIN,
-    append_log::Bool=true,
-    log_path::Union{Nothing,AbstractString}=nothing,
-    narrative_complete::Bool=false,
-    invent_status::Union{Nothing,AbstractString}=nothing,
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
+    baseline::AbstractString = "persson_av",
+    matrix::Symbol = :ci,
+    report_dir::AbstractString = "results/robustness",
+    light::Union{Nothing,Bool} = nothing,
+    δ::Real = DEFAULT_SCORE_MARGIN,
+    append_log::Bool = true,
+    log_path::Union{Nothing,AbstractString} = nothing,
+    narrative_complete::Bool = false,
+    invent_status::Union{Nothing,AbstractString} = nothing,
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
 )
     # CI matrix always light; full matrix defaults to full quant unless light=true
     use_light = light === nothing ? (matrix === :ci) : light
@@ -258,7 +262,9 @@ function run_robustness_matrix(
     out_root = joinpath(report_dir, String(method_name))
     mkpath(out_root)
 
-    println("Robustness matrix: method=$method_name baseline=$baseline matrix=$matrix light=$use_light")
+    println(
+        "Robustness matrix: method=$method_name baseline=$baseline matrix=$matrix light=$use_light",
+    )
     println("  cells: $(length(cells_cfg))  →  $out_root")
 
     cell_results = Dict{String,Any}[]
@@ -269,8 +275,8 @@ function run_robustness_matrix(
             method_name,
             baseline,
             scheme;
-            light=use_light,
-            δ=δ,
+            light = use_light,
+            δ = δ,
         )
         # Strip bulky nested reports from summary cells; write full reports separately
         met = cell["method_report"]
@@ -314,9 +320,9 @@ function run_robustness_matrix(
     conf_ok, conf_note = method_has_confirm_pass(method_name)
     promotion = assess_publication_grade(
         cell_results;
-        narrative_complete=narrative_complete,
-        invent_status=invent_status,
-        confirm_passed=conf_ok,
+        narrative_complete = narrative_complete,
+        invent_status = invent_status,
+        confirm_passed = conf_ok,
     )
     # attach note for agents
     for r in promotion["rules"]
@@ -359,9 +365,9 @@ function run_robustness_matrix(
         lp = something(log_path, default_experiment_log_path())
         append_robustness_log_entry!(
             summary;
-            log_path=lp,
-            hypothesis=hypothesis,
-            lessons=lessons,
+            log_path = lp,
+            hypothesis = hypothesis,
+            lessons = lessons,
         )
         println("Experiment log updated: $lp")
     end
@@ -372,20 +378,22 @@ end
 """Append a Markdown robustness batch entry to the experiment log."""
 function append_robustness_log_entry!(
     summary::AbstractDict;
-    log_path::AbstractString=default_experiment_log_path(),
-    hypothesis::AbstractString="",
-    lessons::AbstractString="",
+    log_path::AbstractString = default_experiment_log_path(),
+    hypothesis::AbstractString = "",
+    lessons::AbstractString = "",
 )
     method = string(summary["method_name"])
     date = Dates.today()
-    id = make_entry_id(method; date=date, suffix="robustness_$(summary["matrix"])")
+    id = make_entry_id(method; date = date, suffix = "robustness_$(summary["matrix"])")
     prom = summary["promotion"]
-    hyp = isempty(strip(hypothesis)) ?
-          "Robustness matrix ($(summary["matrix"]), light=$(summary["light"])) for method $method." :
-          String(hypothesis)
-    les = isempty(strip(lessons)) ?
-          "See promotion rules in summary; eligible=$(prom["eligible"])." :
-          String(lessons)
+    hyp =
+        isempty(strip(hypothesis)) ?
+        "Robustness matrix ($(summary["matrix"]), light=$(summary["light"])) for method $method." :
+        String(hypothesis)
+    les =
+        isempty(strip(lessons)) ?
+        "See promotion rules in summary; eligible=$(prom["eligible"])." :
+        String(lessons)
 
     lines = String[]
     push!(lines, "### $id")
