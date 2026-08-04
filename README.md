@@ -38,7 +38,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **P3.1** Richer 2D capturing |
 | **Completed** | **P3.2** Curved elements |
 | **Completed** | **P3.3a** 2D Riemann + isentropic vortex |
-| Next | **P3.3b** Optional DMR/FFS (reduced) → **P4** Performance |
+| **Completed** | **P3.3b** Optional reduced DMR/FFS |
+| Next | **P4** Performance & scale |
 
 ### Milestone roadmap (M0–M8 complete)
 

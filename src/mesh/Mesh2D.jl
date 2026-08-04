@@ -28,6 +28,8 @@ mutable struct Mesh2D{T}
     geom_ξ::Union{Nothing,Vector{T}}   # 1D nodes for geom Lagrange
     # If set, physical_xy uses analytic wavy map with this amplitude
     wavy_amp::Union{Nothing,T}
+    # Optional solid-element mask (true = inactive / wall-interior); length Nel
+    solid::Union{Nothing,Vector{Bool}}
 end
 
 function Mesh2D(
@@ -41,6 +43,7 @@ function Mesh2D(
     right_bc::AbstractBC=PeriodicBC(),
     bottom_bc::AbstractBC=PeriodicBC(),
     top_bc::AbstractBC=PeriodicBC(),
+    solid::Union{Nothing,AbstractVector{Bool}}=nothing,
     T::Type=Float64,
 )
     nx >= 1 && ny >= 1 || throw(ArgumentError("nx, ny must be >= 1"))
@@ -58,10 +61,17 @@ function Mesh2D(
     yv = collect(range(T(y_bottom), T(y_top); length=ny + 1))
     Δx = diff(xv)
     Δy = diff(yv)
+    Nel = nx * ny
+    solid_vec = if solid === nothing
+        nothing
+    else
+        length(solid) == Nel || throw(ArgumentError("solid mask length must be n_elements=$Nel"))
+        collect(Bool, solid)
+    end
     return Mesh2D{T}(
         nx,
         ny,
-        nx * ny,
+        Nel,
         xv,
         yv,
         Δx,
@@ -76,7 +86,14 @@ function Mesh2D(
         nothing,
         nothing,
         nothing,
+        solid_vec,
     )
+end
+
+"""True if element `e` is marked solid (inactive)."""
+@inline function is_solid(mesh::Mesh2D, e::Int)
+    s = mesh.solid
+    return s !== nothing && s[e]
 end
 
 """Element index from (jx, jy) both 1-based."""

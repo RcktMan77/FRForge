@@ -72,9 +72,47 @@ Contravariant fluxes at a solution point:
 end
 
 """
+Fill continuous contravariant face flux (F̃ or G̃) from interior state + BC.
+
+`into_domain`: true when the reference +direction points into the domain
+(west/south faces). Then L=ghost, R=interior along +ref.
+"""
+function boundary_fhat!(
+    fhat_face::AbstractArray{T,3},
+    q::Int,
+    e::Int,
+    eq,
+    bc::AbstractBC,
+    u_int::AbstractVector{T},
+    nx_out::T,
+    ny_out::T,
+    sJ::T,
+    x::T,
+    y::T,
+    t::T,
+    flux_kind::Symbol,
+    into_domain::Bool,
+) where {T}
+    ug = exterior_state(bc, u_int, nx_out, ny_out, x, y, t)
+    if into_domain
+        # +ref = -outward: L=ghost, R=int, n_+ref = -n_out
+        fh = interface_flux_n(eq, ug, u_int, -nx_out, -ny_out, flux_kind)
+    else
+        # +ref = +outward: L=int, R=ghost, n_+ref = n_out
+        fh = interface_flux_n(eq, u_int, ug, nx_out, ny_out, flux_kind)
+    end
+    @inbounds for c in 1:length(fh)
+        fhat_face[q, c, e] = fh[c] * sJ
+    end
+    return nothing
+end
+
+"""
     residual!(du, state::SolutionState2D, eq, method)
 
 Metric-aware 2D strong-form FR residual (Cartesian or curved) with capturing hooks.
+Supports Periodic / Transmissive / Reflecting / Dirichlet / GhostState BCs and
+optional solid-element masks (forward-facing step etc.).
 """
 function residual!(
     du::AbstractArray{T,4},
@@ -88,6 +126,8 @@ function residual!(
     nx, ny = mesh.nx, mesh.ny
     D, gL, gR = ops.D, ops.gL_ξ, ops.gR_ξ
     ℓ_L, ℓ_R = ops.ℓ_L, ops.ℓ_R
+    t = state.t
+    has_solid = mesh.solid !== nothing
 
     u_work = similar(state.u)
     preprocess_state!(u_work, method, state, eq)
@@ -100,6 +140,7 @@ function residual!(
     trS = zeros(T, Np, Neq, Nel)
     trN = zeros(T, Np, Neq, Nel)
     @inbounds for e in 1:Nel
+        has_solid && is_solid(mesh, e) && continue
         u_e = @view u_work[:, :, e, :]
         trW[:, :, e] = face_trace(u_e, ops, :west)
         trE[:, :, e] = face_trace(u_e, ops, :east)
@@ -108,28 +149,49 @@ function residual!(
     end
 
     # Continuous contravariant numerical fluxes on faces: F̃_hat, G̃_hat
-    # Store as fhat_W/E (ξ-direction F̃) and fhat_S/N (η-direction G̃)
     fhat_W = zeros(T, Np, Neq, Nel)
     fhat_E = zeros(T, Np, Neq, Nel)
     fhat_S = zeros(T, Np, Neq, Nel)
     fhat_N = zeros(T, Np, Neq, Nel)
 
     flux_kind = state.scheme.flux
+    wall = ReflectingBC()
 
-    # Interior vertical faces (shared F̃ = f̂_n * sJ with n from L→R = east of L)
+    # Interior vertical faces
     @inbounds for jy in 1:ny, jx in 1:(nx - 1)
         eL = element_index(mesh, jx, jy)
         eR = element_index(mesh, jx + 1, jy)
+        sL = has_solid && is_solid(mesh, eL)
+        sR = has_solid && is_solid(mesh, eR)
+        (sL && sR) && continue
         for q in 1:Np
-            u_m = collect(@view trE[q, :, eL])
-            u_p = collect(@view trW[q, :, eR])
-            # Use right-element-oriented continuous normal: east of L
             nnx, nny, sJ = met.nx_E[q, eL], met.ny_E[q, eL], met.sJ_E[q, eL]
-            fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
-            for c in 1:Neq
-                val = fh[c] * sJ
-                fhat_E[q, c, eL] = val
-                fhat_W[q, c, eR] = val
+            if sL && !sR
+                # Solid on left → wall on west of fluid eR
+                u_int = collect(@view trW[q, :, eR])
+                x, y = physical_xy(mesh, eR, -one(T), ops.ξ[q])
+                boundary_fhat!(
+                    fhat_W, q, eR, eq, wall, u_int,
+                    met.nx_W[q, eR], met.ny_W[q, eR], met.sJ_W[q, eR],
+                    x, y, t, flux_kind, true,
+                )
+            elseif sR && !sL
+                # Solid on right → wall on east of fluid eL
+                u_int = collect(@view trE[q, :, eL])
+                x, y = physical_xy(mesh, eL, one(T), ops.ξ[q])
+                boundary_fhat!(
+                    fhat_E, q, eL, eq, wall, u_int, nnx, nny, sJ,
+                    x, y, t, flux_kind, false,
+                )
+            else
+                u_m = collect(@view trE[q, :, eL])
+                u_p = collect(@view trW[q, :, eR])
+                fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
+                for c in 1:Neq
+                    val = fh[c] * sJ
+                    fhat_E[q, c, eL] = val
+                    fhat_W[q, c, eR] = val
+                end
             end
         end
     end
@@ -140,52 +202,73 @@ function residual!(
         eR = element_index(mesh, nx, jy)
         for q in 1:Np
             if mesh.left_bc isa PeriodicBC
-                u_m = collect(@view trE[q, :, eR])
-                u_p = collect(@view trW[q, :, eL])
-                nnx, nny, sJ = met.nx_E[q, eR], met.ny_E[q, eR], met.sJ_E[q, eR]
-                fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
-                for c in 1:Neq
-                    val = fh[c] * sJ
-                    fhat_E[q, c, eR] = val
-                    fhat_W[q, c, eL] = val
+                if !(has_solid && (is_solid(mesh, eL) || is_solid(mesh, eR)))
+                    u_m = collect(@view trE[q, :, eR])
+                    u_p = collect(@view trW[q, :, eL])
+                    nnx, nny, sJ = met.nx_E[q, eR], met.ny_E[q, eR], met.sJ_E[q, eR]
+                    fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
+                    for c in 1:Neq
+                        val = fh[c] * sJ
+                        fhat_E[q, c, eR] = val
+                        fhat_W[q, c, eL] = val
+                    end
                 end
             else
-                # Transmissive BC: F̃ continuous uses +ξ geometric orientation
-                # West face of eL: +ξ = -outward_W
-                u_int = collect(@view trW[q, :, eL])
-                sJ = met.sJ_W[q, eL]
-                fh = interface_flux_n(
-                    eq, u_int, u_int, -met.nx_W[q, eL], -met.ny_W[q, eL], flux_kind,
-                )
-                for c in 1:Neq
-                    fhat_W[q, c, eL] = fh[c] * sJ
+                if !(has_solid && is_solid(mesh, eL))
+                    u_int = collect(@view trW[q, :, eL])
+                    x, y = physical_xy(mesh, eL, -one(T), ops.ξ[q])
+                    boundary_fhat!(
+                        fhat_W, q, eL, eq, mesh.left_bc, u_int,
+                        met.nx_W[q, eL], met.ny_W[q, eL], met.sJ_W[q, eL],
+                        x, y, t, flux_kind, true,
+                    )
                 end
-                # East face of eR: +ξ = outward_E
-                u_intR = collect(@view trE[q, :, eR])
-                sJR = met.sJ_E[q, eR]
-                fhR = interface_flux_n(
-                    eq, u_intR, u_intR, met.nx_E[q, eR], met.ny_E[q, eR], flux_kind,
-                )
-                for c in 1:Neq
-                    fhat_E[q, c, eR] = fhR[c] * sJR
+                if !(has_solid && is_solid(mesh, eR))
+                    u_intR = collect(@view trE[q, :, eR])
+                    xR, yR = physical_xy(mesh, eR, one(T), ops.ξ[q])
+                    boundary_fhat!(
+                        fhat_E, q, eR, eq, mesh.right_bc, u_intR,
+                        met.nx_E[q, eR], met.ny_E[q, eR], met.sJ_E[q, eR],
+                        xR, yR, t, flux_kind, false,
+                    )
                 end
             end
         end
     end
 
-    # Interior horizontal faces (shared G̃ = f̂_n * sJ, n = north of bottom)
+    # Interior horizontal faces
     @inbounds for jy in 1:(ny - 1), jx in 1:nx
         eB = element_index(mesh, jx, jy)
         eT = element_index(mesh, jx, jy + 1)
+        sB = has_solid && is_solid(mesh, eB)
+        sT = has_solid && is_solid(mesh, eT)
+        (sB && sT) && continue
         for q in 1:Np
-            u_m = collect(@view trN[q, :, eB])
-            u_p = collect(@view trS[q, :, eT])
             nnx, nny, sJ = met.nx_N[q, eB], met.ny_N[q, eB], met.sJ_N[q, eB]
-            fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
-            for c in 1:Neq
-                val = fh[c] * sJ
-                fhat_N[q, c, eB] = val
-                fhat_S[q, c, eT] = val
+            if sB && !sT
+                u_int = collect(@view trS[q, :, eT])
+                x, y = physical_xy(mesh, eT, ops.ξ[q], -one(T))
+                boundary_fhat!(
+                    fhat_S, q, eT, eq, wall, u_int,
+                    met.nx_S[q, eT], met.ny_S[q, eT], met.sJ_S[q, eT],
+                    x, y, t, flux_kind, true,
+                )
+            elseif sT && !sB
+                u_int = collect(@view trN[q, :, eB])
+                x, y = physical_xy(mesh, eB, ops.ξ[q], one(T))
+                boundary_fhat!(
+                    fhat_N, q, eB, eq, wall, u_int, nnx, nny, sJ,
+                    x, y, t, flux_kind, false,
+                )
+            else
+                u_m = collect(@view trN[q, :, eB])
+                u_p = collect(@view trS[q, :, eT])
+                fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
+                for c in 1:Neq
+                    val = fh[c] * sJ
+                    fhat_N[q, c, eB] = val
+                    fhat_S[q, c, eT] = val
+                end
             end
         end
     end
@@ -196,41 +279,43 @@ function residual!(
         eT = element_index(mesh, jx, ny)
         for q in 1:Np
             if mesh.bottom_bc isa PeriodicBC
-                u_m = collect(@view trN[q, :, eT])
-                u_p = collect(@view trS[q, :, eB])
-                nnx, nny, sJ = met.nx_N[q, eT], met.ny_N[q, eT], met.sJ_N[q, eT]
-                fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
-                for c in 1:Neq
-                    val = fh[c] * sJ
-                    fhat_N[q, c, eT] = val
-                    fhat_S[q, c, eB] = val
+                if !(has_solid && (is_solid(mesh, eB) || is_solid(mesh, eT)))
+                    u_m = collect(@view trN[q, :, eT])
+                    u_p = collect(@view trS[q, :, eB])
+                    nnx, nny, sJ = met.nx_N[q, eT], met.ny_N[q, eT], met.sJ_N[q, eT]
+                    fh = interface_flux_n(eq, u_m, u_p, nnx, nny, flux_kind)
+                    for c in 1:Neq
+                        val = fh[c] * sJ
+                        fhat_N[q, c, eT] = val
+                        fhat_S[q, c, eB] = val
+                    end
                 end
             else
-                # South of eB: +η = -outward_S
-                u_int = collect(@view trS[q, :, eB])
-                sJ = met.sJ_S[q, eB]
-                fh = interface_flux_n(
-                    eq, u_int, u_int, -met.nx_S[q, eB], -met.ny_S[q, eB], flux_kind,
-                )
-                for c in 1:Neq
-                    fhat_S[q, c, eB] = fh[c] * sJ
+                if !(has_solid && is_solid(mesh, eB))
+                    u_int = collect(@view trS[q, :, eB])
+                    x, y = physical_xy(mesh, eB, ops.ξ[q], -one(T))
+                    boundary_fhat!(
+                        fhat_S, q, eB, eq, mesh.bottom_bc, u_int,
+                        met.nx_S[q, eB], met.ny_S[q, eB], met.sJ_S[q, eB],
+                        x, y, t, flux_kind, true,
+                    )
                 end
-                # North of eT: +η = outward_N
-                u_intT = collect(@view trN[q, :, eT])
-                sJN = met.sJ_N[q, eT]
-                fhT = interface_flux_n(
-                    eq, u_intT, u_intT, met.nx_N[q, eT], met.ny_N[q, eT], flux_kind,
-                )
-                for c in 1:Neq
-                    fhat_N[q, c, eT] = fhT[c] * sJN
+                if !(has_solid && is_solid(mesh, eT))
+                    u_intT = collect(@view trN[q, :, eT])
+                    xT, yT = physical_xy(mesh, eT, ops.ξ[q], one(T))
+                    boundary_fhat!(
+                        fhat_N, q, eT, eq, mesh.top_bc, u_intT,
+                        met.nx_N[q, eT], met.ny_N[q, eT], met.sJ_N[q, eT],
+                        xT, yT, t, flux_kind, false,
+                    )
                 end
             end
         end
     end
 
-    # Volume residual with metric fluxes
+    # Volume residual with metric fluxes (skip solid elements)
     @inbounds for e in 1:Nel
-        # Build F̃, G̃ at all SPs
+        has_solid && is_solid(mesh, e) && continue
         Ft = zeros(T, Np, Np, Neq)
         Gt = zeros(T, Np, Np, Neq)
         for j in 1:Np, i in 1:Np
@@ -245,7 +330,6 @@ function residual!(
             end
         end
 
-        # ξ-direction FR for each fixed j
         for j in 1:Np
             for c in 1:Neq
                 fL = zero(T)
@@ -267,7 +351,6 @@ function residual!(
             end
         end
 
-        # η-direction FR for each fixed i
         for i in 1:Np
             for c in 1:Neq
                 gS = zero(T)
@@ -292,7 +375,19 @@ function residual!(
 
     σ = zeros(T, Nel)
     sense!(σ, method, u_work, state, eq)
+    if has_solid
+        @inbounds for e in 1:Nel
+            is_solid(mesh, e) && (σ[e] = zero(T))
+        end
+    end
     apply_dissipation!(du, method, σ, u_work, state, eq)
+    if has_solid
+        @inbounds for e in 1:Nel
+            if is_solid(mesh, e)
+                du[:, :, e, :] .= zero(T)
+            end
+        end
+    end
     return du
 end
 
