@@ -140,6 +140,8 @@ export run_advection2d_smooth_order, run_euler2d_smooth_order, run_euler2d_disco
 export run_m8_2d_suite, run_p31_2d_capturing_suite
 export run_freestream_preservation_2d, run_advection2d_curved_order
 export run_euler2d_curved_discontinuous, run_p32_curved_suite
+export riemann2d_ic, riemann2d_cfg3_ic, RIEMANN2D_CFG3, RIEMANN2D_CFG6, run_euler2d_riemann
+export isentropic_vortex_primitives, run_isentropic_vortex_order, run_p33a_benchmark_suite
 
 export list_methods, describe_methods, ScaledPerssonMethod
 export invent_method, score_reports, run_method_report, write_report

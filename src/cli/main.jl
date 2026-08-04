@@ -251,6 +251,11 @@ function cli_test(opts::AbstractDict)
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
         method = "null"
+    elseif suite in ("benchmarks", "p33a", "riemann", "vortex")
+        cases, overall_pass, hard_fails = run_p33a_benchmark_suite()
+        diverged = any(c -> get(c, "diverged", false) === true, cases)
+        nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
+        method = "mixed"
     elseif suite == "full"
         c1, p1, f1 = run_m1_advection_suite()
         c2, p2, f2 = run_m2_burgers_suite()
@@ -264,7 +269,10 @@ function cli_test(opts::AbstractDict)
         diverged = any(c -> get(c, "diverged", false) === true, cases)
         nan_detected = any(c -> get(c, "nan_detected", false) === true, cases)
     else
-        println(stderr, "Unknown suite: $suite (use smoke|…|quant|2d|full)")
+        println(
+            stderr,
+            "Unknown suite: $suite (use smoke|advection|burgers|euler|capturing|quant|2d|2d_capturing|curved|benchmarks|full)",
+        )
         return 2
     end
 
