@@ -171,14 +171,12 @@ Shu–Osher is **most stable at lower $p$** with the present AV + explicit SSP-R
   <img src="docs/images/riemann_cfg6_schlieren.png" alt="2D Riemann cfg6 numerical Schlieren" width="48%" />
   <img src="docs/images/riemann_cfg6_pressure.png" alt="2D Riemann cfg6 pressure" width="48%" />
 </p>
-
-<div align="center">
-
-**Left:** numerical Schlieren $|\nabla\rho|$ (white→black). **Right:** pressure.
-
-*Figure: 2D Riemann problem (Lax–Liu configuration 6), documentation baseline with `persson_av` (presentation mesh $192\times 192$, $p=2$, $t=0.15$); not invent/CI-light resolution. High-order VTU + ParaView tessellate/resample — see [docs/visualization.md](docs/visualization.md).*
-
-</div>
+<p align="center">
+  <sub><strong>Left:</strong> numerical Schlieren |∇ρ| (white→black). &nbsp; <strong>Right:</strong> pressure.</sub>
+</p>
+<p align="center">
+  <em>Figure: 2D Riemann problem (Lax–Liu configuration 6), documentation baseline with <code>persson_av</code> (presentation mesh 192×192, p = 2, t = 0.15); not invent/CI-light resolution. High-order VTU + ParaView tessellate/resample — see <a href="docs/visualization.md">docs/visualization.md</a>.</em>
+</p>
 
 <p align="center">
   <img src="docs/images/double_mach_schlieren.png" alt="Double Mach numerical Schlieren" width="90%" />
@@ -186,14 +184,12 @@ Shu–Osher is **most stable at lower $p$** with the present AV + explicit SSP-R
 <p align="center">
   <img src="docs/images/double_mach_pressure.png" alt="Double Mach pressure" width="90%" />
 </p>
-
-<div align="center">
-
-**Top:** numerical Schlieren $|\nabla\rho|$ (white→black). **Bottom:** pressure.
-
-*Figure: Reduced Double-Mach-like configuration (inclined shock + reflecting wall), documentation baseline with `persson_av` (presentation mesh $280\times 100$, $p=1$, $t=0.08$). Same pipeline as the Riemann figures; optional/full CI tier for the short reduced case — see [docs/visualization.md](docs/visualization.md).*
-
-</div>
+<p align="center">
+  <sub><strong>Top:</strong> numerical Schlieren |∇ρ| (white→black). &nbsp; <strong>Bottom:</strong> pressure.</sub>
+</p>
+<p align="center">
+  <em>Figure: Reduced Double-Mach-like configuration (inclined shock + reflecting wall), documentation baseline with <code>persson_av</code> (presentation mesh 280×100, p = 1, t = 0.08). Same pipeline as the Riemann figures; optional/full CI tier for the short reduced case — see <a href="docs/visualization.md">docs/visualization.md</a>.</em>
+</p>
 
 ### Supporting checks
 
