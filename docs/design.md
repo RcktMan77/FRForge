@@ -1229,6 +1229,24 @@ Read-only layer over the Markdown log (no suite re-run, no log rewrite):
 
 Optional `--json path` for machine-readable output. **CI tier:** unit tests only (required CI).
 
+### Reproducibility snapshots (Phase 5.2+)
+
+Immutable package of a short-listed method for publication-style re-runs:
+
+```
+frforge snapshot freeze --method M --baseline persson_av \
+  --method-report … --baseline-report … [--compare …]
+frforge snapshot verify <dir>              # cheap (default): hashes + manifest
+frforge snapshot verify <dir> --rerun      # explicit full invent (nightly/manual)
+frforge snapshot tables <dir> --out t.md
+```
+
+**When to freeze:** only after a method is **short-listed** or has survived a **robustness** look — **not** after every invent run.
+
+Source files resolve from `METHOD_SOURCE_MAP` / `src/methods/` convention; freeze **fails** if none found (`--source` escape hatch). Snapshot creation appends a short `status=snapshot_created` log entry (path, method, git_ref only). Template: `docs/reproduce_method_template.md`.
+
+**CI tier:** cheap verify + freeze unit tests only; never `--rerun` in required CI.
+
 ### Configurable base schemes (Phase 2.2+)
 
 `SchemeConfig(points, flux, time)` with **`DEFAULT_SCHEME = SchemeConfig(:gl, :rusanov, :ssp_rk3)`** frozen for invent scoring.

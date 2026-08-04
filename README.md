@@ -40,8 +40,9 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **P3.3a** 2D Riemann + isentropic vortex |
 | **Completed** | **P3.3b** Optional reduced DMR/FFS |
 | **Completed** | **P4** Performance (alloc reduction, numeric fidelity) |
-| **In progress** | **P5.1** Experiment-log analytics |
-| Next | **P5.2** Publication / reproducibility snapshots |
+| **Completed** | **P5.1** Experiment-log analytics |
+| **Completed** | **P5.2** Publication / reproducibility snapshots |
+| Next | Further invent methods / higher-res benchmarks |
 
 ### Milestone roadmap (M0–M8 complete)
 

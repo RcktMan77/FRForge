@@ -1,0 +1,32 @@
+{
+  "absolute_scores": {
+    "composite": 0.9235235558247195,
+    "dissipation": 0.9441145757080391,
+    "order_preservation": 1.0,
+    "robustness": 1.0,
+    "shock_quality": 0.7499796475908383
+  },
+  "baseline_absolute_scores": {
+    "composite": 0.918663861117966,
+    "dissipation": 0.9556437051704008,
+    "order_preservation": 1.0,
+    "robustness": 1.0,
+    "shock_quality": 0.7190117393014638
+  },
+  "baseline_composite": 0.918663861117966,
+  "baseline_name": "persson_av",
+  "candidate_status": "pass_gates",
+  "composite": 0.9235235558247195,
+  "composite_margin": 0.0048596947067534035,
+  "relative_scores": {
+    "composite": 0.8250541247626677,
+    "dissipation": 0.5502164990506713,
+    "order_preservation": 1.0,
+    "robustness": 1.0,
+    "shock_quality": 0.75
+  },
+  "score_margin_threshold": 0.02,
+  "tradeoff_notes": "order_preserved,shock_improved,composite_improved",
+  "tradeoff_ok": true,
+  "vtk_produced": false
+}

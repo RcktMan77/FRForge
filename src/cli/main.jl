@@ -2,7 +2,7 @@
 
 function _print_usage(io=stderr)
     println(io, "FRForge — high-order Flux Reconstruction laboratory")
-    println(io, "Usage: frforge {test|run|invent|score|log|robustness} [options]")
+    println(io, "Usage: frforge {test|run|invent|score|log|snapshot|robustness} [options]")
     println(io)
     println(io, "Commands:")
     println(io, "  test         Run verification suite and emit JSON report")
@@ -10,6 +10,7 @@ function _print_usage(io=stderr)
     println(io, "  invent       Run quant suite for a method vs baseline and classify candidate")
     println(io, "  score        Classify two existing JSON reports (method vs baseline)")
     println(io, "  log          Experiment log: list|summary|frontier|lessons|show|append")
+    println(io, "  snapshot     Freeze/verify/tables for reproducibility packages")
     println(io, "  robustness   Scheme robustness matrix (CI-light or full/nightly)")
     println(io)
     println(io, "Agent workflow: read research/experiment_log.md before inventing methods.")
@@ -790,6 +791,151 @@ function cli_score(args)
     return cmp["candidate_status"] == "rejected" ? 1 : 0
 end
 
+function _parse_snapshot_args(args)
+    if isempty(args) || args[1] in ("-h", "--help", "help")
+        return Dict("sub" => "help")
+    end
+    sub = args[1]
+    rest = args[2:end]
+    if sub == "freeze"
+        s = ArgParseSettings(description="Freeze a reproducibility snapshot.", prog="frforge snapshot freeze")
+        @add_arg_table! s begin
+            "--method", "-m"
+            required = true
+            "--baseline", "-b"
+            default = "persson_av"
+            "--method-report"
+            required = true
+            dest_name = "method_report"
+            "--baseline-report"
+            required = true
+            dest_name = "baseline_report"
+            "--compare"
+            default = ""
+            "--out"
+            help = "Snapshot root directory"
+            default = "results/snapshots"
+            "--git-ref"
+            default = ""
+            dest_name = "git_ref"
+            "--source"
+            help = "Extra source file (repeatable escape hatch)"
+            action = :append_arg
+            default = String[]
+            "--no-append-log"
+            action = :store_true
+            dest_name = "no_append_log"
+            "--log-path"
+            default = ""
+            dest_name = "log_path"
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "freeze"
+        return opts
+    elseif sub == "verify"
+        s = ArgParseSettings(
+            description="Verify snapshot (default: cheap hash check; --rerun for invent).",
+            prog="frforge snapshot verify",
+        )
+        @add_arg_table! s begin
+            "path"
+            help = "Snapshot directory"
+            required = true
+            "--rerun"
+            help = "Explicit full invent re-run (slow; not for required CI)"
+            action = :store_true
+            "--require-git-ref"
+            action = :store_true
+            dest_name = "require_git_ref"
+            "--tol-rel"
+            arg_type = Float64
+            default = 1e-10
+            dest_name = "tol_rel"
+            "--tol-abs"
+            arg_type = Float64
+            default = 1e-12
+            dest_name = "tol_abs"
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "verify"
+        return opts
+    elseif sub == "tables"
+        s = ArgParseSettings(description="Tables from frozen snapshot JSON.", prog="frforge snapshot tables")
+        @add_arg_table! s begin
+            "path"
+            required = true
+            "--out"
+            help = "Markdown output path"
+            default = ""
+            "--csv"
+            help = "CSV output path"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "tables"
+        return opts
+    else
+        return Dict("sub" => "unknown", "cmd" => sub)
+    end
+end
+
+function cli_snapshot(args)
+    opts = _parse_snapshot_args(args)
+    sub = opts["sub"]
+    if sub == "help"
+        println("Usage: frforge snapshot {freeze|verify|tables}")
+        println("  freeze   Package method sources + reports + hashes (immutable)")
+        println("  verify   Cheap hash/manifest check (default); add --rerun for invent")
+        println("  tables   Markdown/CSV comparison tables from frozen JSON")
+        println("Freeze only after short-list / robustness — not after every invent run.")
+        return 0
+    elseif sub == "freeze"
+        compare = isempty(opts["compare"]) ? nothing : opts["compare"]
+        log_path = isempty(opts["log_path"]) ? default_experiment_log_path() : opts["log_path"]
+        extra = String.(opts["source"])
+        dir = freeze_snapshot(;
+            method=opts["method"],
+            baseline=opts["baseline"],
+            method_report=opts["method_report"],
+            baseline_report=opts["baseline_report"],
+            compare=compare,
+            out_root=opts["out"],
+            git_ref=opts["git_ref"],
+            source_extra=extra,
+            log_path=log_path,
+            append_log=!opts["no_append_log"],
+        )
+        println("Snapshot frozen: $dir")
+        return 0
+    elseif sub == "verify"
+        res = verify_snapshot(
+            opts["path"];
+            rerun=opts["rerun"],
+            tol_rel=opts["tol_rel"],
+            tol_abs=opts["tol_abs"],
+            require_git_ref=opts["require_git_ref"],
+        )
+        println("mode=$(res["mode"]) ok=$(res["ok"]) method=$(res["method"])")
+        if !isempty(res["errors"])
+            for e in res["errors"]
+                println(stderr, "  ERROR: ", e)
+            end
+        end
+        return res["ok"] ? 0 : 1
+    elseif sub == "tables"
+        out_md = isempty(opts["out"]) ? nothing : opts["out"]
+        out_csv = isempty(opts["csv"]) ? nothing : opts["csv"]
+        tab = snapshot_tables(opts["path"]; out_md=out_md, out_csv=out_csv)
+        print(tab["markdown"])
+        out_md !== nothing && println("Wrote $out_md")
+        out_csv !== nothing && println("Wrote $out_csv")
+        return 0
+    else
+        println(stderr, "Unknown snapshot subcommand: ", get(opts, "cmd", sub))
+        return 2
+    end
+end
+
 function _parse_robustness_args(args)
     s = ArgParseSettings(
         description="Robustness matrix across scheme axes (points × flux × time).",
@@ -904,6 +1050,8 @@ function main_cli(args=ARGS)
             return cli_score(rest)
         elseif cmd == "log"
             return cli_log(rest)
+        elseif cmd == "snapshot"
+            return cli_snapshot(rest)
         elseif cmd == "robustness"
             return cli_robustness(rest)
         else
