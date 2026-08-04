@@ -329,8 +329,10 @@ end
     du2 = similar(state.u)
     residual!(du2, state, eq, NullCapturing())
     @test du == du2
-    # Vortex L2 within FP noise of known pre-P4 reference (n=8,p=2,t=0.5)
-    c = run_isentropic_vortex_order(; p=2, n_list=[8], t_final=0.5, cfl=0.08)
+    # Vortex L2 within FP noise of pre-P4 reference (same n_list so fixed-Δt matches)
+    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
     @test !c["diverged"]
     @test isapprox(c["l2_errors"][1], 0.02069688015968434; rtol=1e-12, atol=1e-14)
+    @test isapprox(c["l2_errors"][2], 0.0031146731348864697; rtol=1e-12, atol=1e-14)
+    @test isapprox(c["observed_orders"][1], 2.7322606381318906; rtol=1e-10, atol=1e-12)
 end

@@ -27,6 +27,13 @@ Git before: `b54bd75` (post P3.3b). After: this P4 commit.
 - Observed order: `2.73226063813189` → `2.73226063813174` (FP noise).
 - Residual is bit-deterministic (two calls → identical `du`).
 
+## Full local `Pkg.test` wall time
+
+| | Wall (s) | Notes |
+|--|----------|--------|
+| Before P4 (post–P3.2, ~599 tests) | ~492 | Pre–P3.3a/b content; includes compile |
+| After P4 (post–P3.3a/b + perf, ~637 tests) | ~334 | More tests, still faster overall |
+
 ## CI
 
 Full package test wall times: see GHA logs on PRs #33–#35 (Julia 1.10/1.11 Ubuntu).
