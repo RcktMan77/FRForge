@@ -112,6 +112,7 @@ include("cli/main.jl")
 export main_cli
 export write_report_skeleton, load_report, validate_report_keys, write_report
 export write_json_pretty, report_trio_paths, stamp_workflow_report!, print_report_trio
+export resolve_log_paths, report_artifact_dict, maybe_append_workflow_log!
 export DEFAULT_SCORING_WEIGHTS, SCORING_FORMULA_VERSION, SCHEMA_VERSION
 export REQUIRED_TOP_LEVEL_KEYS, REQUIRED_SUMMARY_KEYS
 export case_report_dict

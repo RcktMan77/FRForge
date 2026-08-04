@@ -13,11 +13,27 @@
 
 ---
 
+## Reader's guide
+
+| Need | Go to |
+|------|--------|
+| **What is shipped right now?** | [Current state](#current-state-implementation-status-2026-08-04) |
+| **Invent / confirm / scoring policy** | Current state + invent sections; frozen scheme **GL + Rusanov + SSP-RK3** |
+| **How residual hooks work** | Capturing pipeline / residual stages |
+| **JSON report + scores** | Verification schema + scoring contract |
+| **Package layout / CLI** | Package structure; `src/FRForge.jl` includes |
+| **Historical M0–M8 delivery** | Milestone implementation notes + appendices (historical; not the live API contract) |
+
+**Normative for day-to-day work:** current state, residual hook contract, invent frozen scheme, serial residual for invent/confirm, scoring formula version in `Scoring.jl`.  
+**Historical:** milestone gates, original PR plan, early non-goals phrased for M0–M8 only (superseded notes appear under Current state / Non-Goals).
+
+---
+
 ## Overview
 
 FRForge is a green-field, self-contained Julia package that implements Flux Reconstruction (FR) schemes for hyperbolic conservation laws, with the primary purpose of inventing and quantitatively evaluating novel shock-capturing / discontinuity-treatment methods. The laboratory is deliberately narrow: start from first-principles 1D FR, enforce machine-readable verification at every step, and keep discontinuity treatment fully pluggable so agents can propose structurally new methods (sensors, residual dissipation, interface reconstruction/limiting, hybrid schemes) rather than only tuning coefficients of a single heuristic.
 
-This document is the implementation blueprint. It fixes package layout, FR operator conventions (including explicit \(g_{DG}\) construction), mesh/state/BC representations, a staged residual hook pipeline for capturing, JSON report schemas with a locked agent scoring contract, CLI surface, high-order VTK strategy (ParaView-safe node ordering), agent invention workflow, and Git branching. Later sections retain the original M0–M8 / post-M8 phase notes as historical delivery record; the **Current state** subsection above reflects the shipped laboratory.
+This document is the implementation blueprint. It fixes package layout, FR operator conventions (including explicit \(g_{DG}\) construction), mesh/state/BC representations, a staged residual hook pipeline for capturing, JSON report schemas with a locked agent scoring contract, CLI surface, high-order VTK strategy (ParaView-safe node ordering), agent invention workflow, and Git branching. Later sections retain the original M0–M8 / post-M8 phase notes as historical delivery record; the **Current state** subsection reflects the shipped laboratory.
 
 ---
 
