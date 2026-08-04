@@ -34,7 +34,6 @@
 - [Numerical schemes](#numerical-schemes)
 - [Test cases](#test-cases)
 - [How methods are judged](#how-methods-are-judged)
-- [Invent workflow: what is frozen vs. yours](#invent-workflow-what-is-frozen-vs-yours)
 - [Getting started](#getting-started)
 - [Adding a new capturing method](#adding-a-new-capturing-method)
 - [Further documentation](#further-documentation)
@@ -245,26 +244,6 @@ Confirm **does not rewrite** invent composites. Default preset ~10–30 min clas
 
 ---
 
-## Invent workflow: what is frozen vs. yours
-
-When you **add a method and run invent**, most of the laboratory stays fixed so scores remain comparable. You primarily change **capturing code**—not the FR scheme, scoring rules, or mesh family used for history.
-
-| Layer | Frozen for invent history? | What you change when inventing |
-|-------|----------------------------|--------------------------------|
-| **Capturing method** | No — this is the research object | New types in `src/methods/`, hooks, sensors, AV, hybrids |
-| **Solution points / flux / time** | **Yes** — GL + Rusanov + SSP-RK3 | Do **not** retune invent defaults for composite history; use robustness / local exploration instead |
-| **Quant suite definition & scoring** | **Yes** (formula v1, gates, weights) | Read scores; don’t fork scoring for invent claims |
-| **Coarse invent meshes / cases** | **Yes** (CI-light quant path) | Same suite for all invent runs unless a **logged re-baseline** |
-| **Confirm / presentation meshes** | Separate stream | Finer meshes after short-list; not invent history |
-| **Experiment log narrative** | Partially | You write `hypothesis` / `lessons` (required for promising+) |
-| **Threading / BLAS** | Serial for invent | Docs threads ignored for official composites |
-
-**In short:** invent mostly **ignores** scheme-axis knobs (GLL, HLLC, SSP-RK2), docs threading, and presentation mesh choices. Those exist for robustness, local experiments, and figures. What invent *cares about* is your registered method on the **frozen** scheme + suite.
-
-Optional **coefficient scouting** (`frforge tune`) grids a parameter on the light suite **without** appending invent history—you still run `frforge invent` on a chosen method for a logged claim.
-
----
-
 ## Getting started
 
 ### Requirements
@@ -318,13 +297,12 @@ Full CLI: `./bin/frforge --help`. Tests: `julia --project=. -e 'using Pkg; Pkg.t
 
 1. Implement `AbstractCapturingMethod` hooks in `src/methods/MyMethod.jl` (override only what you need).
 2. `include` + `register_method!("my_method", …)` in [`src/methods/Registry.jl`](src/methods/Registry.jl).
-3. `./bin/frforge invent --method my_method --baseline persson_av`  
-   → FR scheme, quant meshes, and scoring stay **default**; only your method code path differs.
+3. `./bin/frforge invent --method my_method --baseline persson_av`
 4. Inspect `candidate_status`; for promising+, write real **hypothesis/lessons** in the experiment log.
 5. If short-listed: `./bin/frforge confirm --method my_method`, then robustness as needed.
 6. Paper freeze: `frforge snapshot freeze … --require-confirm`.
 
-**Structural novelty is primary** (new sensors/operators/hybrids). Coefficient-only search is secondary (`tune` → then invent a named method).
+Structural novelty (new sensors, operators, hybrids) is the primary research goal; coefficient-only search is secondary.
 
 ---
 
