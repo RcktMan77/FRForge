@@ -82,11 +82,11 @@ Expected VTU files from the driver:
 
 ### 2. Generate images (`pvpython`)
 
-Point `pvpython` at your ParaView install if it is not on `PATH`:
+Point `pvpython` at your ParaView install if it is not on `PATH` (required on most macOS installs):
 
 ```bash
-# macOS example — adjust version path
-export PVPYTHON="/Applications/ParaView-5.12.0.app/Contents/bin/pvpython"
+# macOS — use the pvpython inside the ParaView app (tested: 6.1.0)
+export PVPYTHON="/Applications/ParaView-6.1.0.app/Contents/bin/pvpython"
 
 # Riemann
 $PVPYTHON scripts/docs/paraview/plot_2d_publication.py \

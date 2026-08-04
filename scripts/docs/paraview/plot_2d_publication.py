@@ -2,29 +2,21 @@
 """
 Publication-style 2D figures from FRForge high-order VTU (ParaView / pvpython).
 
-Produces (for a given --prefix):
-  {prefix}_schlieren.png   — inverted grayscale |∇ρ|
-  {prefix}_pressure.png    — pressure field
-  {prefix}_sensor.png      — modal sensor σ (or av if sensor missing)
-  {prefix}_lineout.png     — density (and pressure) line cuts
-  {prefix}_lineout.csv     — numeric samples for the cuts
+Tested with ParaView 6.1 (macOS). Use the `pvpython` that ships with ParaView:
 
-Requirements:
-  - ParaView with pvpython (or `paraview` Python package matching your install)
-  - VTU from FRForge write_vtu_high_order[_with_capturing]
-
-Examples:
-  pvpython scripts/docs/paraview/plot_2d_publication.py \\
-    --vtu results/docs_vtu/riemann_cfg6_persson_av.vtu \\
+  /Applications/ParaView-6.1.0.app/Contents/bin/pvpython \\
+    scripts/docs/paraview/plot_2d_publication.py \\
+    --vtu results/docs_vtu/riemann_cfg6_baseline.vtu \\
     --outdir results/docs_figures \\
     --prefix riemann_cfg6_baseline \\
     --case riemann
 
-  pvpython scripts/docs/paraview/plot_2d_publication.py \\
-    --vtu results/docs_vtu/double_mach_persson_av.vtu \\
-    --outdir results/docs_figures \\
-    --prefix double_mach_baseline \\
-    --case dmr
+Produces:
+  {prefix}_schlieren.png   — inverted grayscale |∇ρ|
+  {prefix}_pressure.png    — pressure field
+  {prefix}_sensor.png      — modal sensor σ (or av if sensor missing)
+  {prefix}_lineout.png     — density/pressure line cuts (when chart view works)
+  {prefix}_lineout.csv     — numeric samples for the cuts
 """
 
 from __future__ import print_function
@@ -33,42 +25,6 @@ import argparse
 import csv
 import os
 import sys
-
-
-def _import_paraview():
-    try:
-        from paraview.simple import (
-            XMLUnstructuredGridReader,
-            Gradient,
-            Calculator,
-            Contour,
-            PlotOverLine,
-            GetActiveViewOrCreate,
-            GetColorTransferFunction,
-            GetOpacityTransferFunction,
-            GetAnimationScene,
-            ColorBy,
-            Hide,
-            Show,
-            SaveScreenshot,
-            UpdatePipeline,
-            Delete,
-            Render,
-            ResetCamera,
-            CreateLayout,
-        )
-        import paraview.servermanager as sm
-        return True
-    except Exception as e:
-        print(
-            "ERROR: Could not import ParaView Python bindings.\n"
-            "  Run this script with `pvpython` from your ParaView install, e.g.:\n"
-            "    /Applications/ParaView-*.app/Contents/bin/pvpython ...\n"
-            "    or:  pvpython scripts/docs/paraview/plot_2d_publication.py ...\n"
-            "Import error: %s" % e,
-            file=sys.stderr,
-        )
-        return False
 
 
 def parse_args(argv=None):
@@ -97,25 +53,34 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-def _point_array_names(reader):
-    """Return list of point data array names."""
+def _import_paraview():
     try:
-        info = reader.GetPointDataInformation()
-        names = []
-        for i in range(info.GetNumberOfArrays()):
-            names.append(info.GetArray(i).GetName())
-        return names
+        import paraview.simple  # noqa: F401
+        return True
+    except Exception as e:
+        print(
+            "ERROR: Could not import ParaView Python bindings.\n"
+            "  Run with the ParaView-bundled pvpython, e.g.:\n"
+            "    /Applications/ParaView-6.1.0.app/Contents/bin/pvpython \\\n"
+            "      scripts/docs/paraview/plot_2d_publication.py ...\n"
+            "Import error: %s" % e,
+            file=sys.stderr,
+        )
+        return False
+
+
+def _point_array_names(src):
+    try:
+        info = src.GetPointDataInformation()
+        return [info.GetArray(i).GetName() for i in range(info.GetNumberOfArrays())]
     except Exception:
         return []
 
 
-def _cell_array_names(reader):
+def _cell_array_names(src):
     try:
-        info = reader.GetCellDataInformation()
-        names = []
-        for i in range(info.GetNumberOfArrays()):
-            names.append(info.GetArray(i).GetName())
-        return names
+        info = src.GetCellDataInformation()
+        return [info.GetArray(i).GetName() for i in range(info.GetNumberOfArrays())]
     except Exception:
         return []
 
@@ -126,8 +91,14 @@ def _setup_view(size=(1400, 1200)):
     view = GetActiveViewOrCreate("RenderView")
     view.ViewSize = list(size)
     view.Background = [1.0, 1.0, 1.0]
-    view.OrientationAxesVisibility = 0
-    view.CameraParallelProjection = 1
+    try:
+        view.OrientationAxesVisibility = 0
+    except Exception:
+        pass
+    try:
+        view.CameraParallelProjection = 1
+    except Exception:
+        pass
     return view
 
 
@@ -139,43 +110,46 @@ def _hide_all(view):
             Hide(src, view)
         except Exception:
             pass
-
-
-def _color_by_point(display, view, name, cmap="Cool to Warm", invert=False, log=False):
-    from paraview.simple import (
-        ColorBy,
-        GetColorTransferFunction,
-        GetOpacityTransferFunction,
-    )
-
-    ColorBy(display, ("POINTS", name))
-    display.RescaleTransferFunctionToDataRange(True, False)
-    display.SetScalarBarVisibility(view, True)
-    lut = GetColorTransferFunction(name)
+    # Remove leftover scalar bars from previous plots (ParaView keeps them otherwise)
     try:
-        lut.ApplyPreset(cmap, True)
+        from paraview.simple import GetScalarBars
+
+        for sb in list(GetScalarBars(view=view)):
+            try:
+                sb.Visibility = 0
+            except Exception:
+                pass
     except Exception:
         pass
+    try:
+        # Alternate API
+        bars = getattr(view, "Representations", None)
+        if bars is not None:
+            for rep in list(view.Representations):
+                try:
+                    if "ScalarBar" in type(rep).__name__ or "LUT" in type(rep).__name__:
+                        rep.Visibility = 0
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def _apply_lut(name, presets, invert=False):
+    from paraview.simple import GetColorTransferFunction
+
+    lut = GetColorTransferFunction(name)
+    for preset in presets:
+        try:
+            lut.ApplyPreset(preset, True)
+            break
+        except Exception:
+            continue
     if invert:
         try:
             lut.InvertTransferFunction()
         except Exception:
-            # manual reverse: swap RGB points if needed — Invert is available in modern PV
             pass
-    if log:
-        try:
-            lut.MapControlPointsToLogSpace()
-            lut.UseLogScale = 1
-        except Exception:
-            pass
-    # clean scalar bar
-    try:
-        sb = display.LookupTable
-        # ScalarBar is accessed via view representations
-        for proxy in view.Representations:
-            pass
-    except Exception:
-        pass
     return lut
 
 
@@ -183,24 +157,29 @@ def _save(view, path, width, height, res=2):
     from paraview.simple import SaveScreenshot, Render
 
     Render(view)
-    SaveScreenshot(
-        path,
-        view,
-        ImageResolution=[width * res, height * res],
-        OverrideColorPalette="WhiteBackground",
+    kwargs = dict(
+        ImageResolution=[int(width * res), int(height * res)],
         TransparentBackground=0,
-        CompressionLevel="5",
     )
+    # Palette keyword differs slightly across versions
+    try:
+        SaveScreenshot(path, view, OverrideColorPalette="WhiteBackground", **kwargs)
+    except TypeError:
+        try:
+            SaveScreenshot(path, view, **kwargs)
+        except Exception as e:
+            print("  ERROR SaveScreenshot:", e, file=sys.stderr)
+            return False
     print("  wrote", path)
+    return True
 
 
 def _bounds(reader):
     from paraview.simple import UpdatePipeline
 
-    UpdatePipeline()
+    UpdatePipeline(proxy=reader)
     d = reader.GetDataInformation().GetBounds()
-    # (xmin,xmax,ymin,ymax,zmin,zmax)
-    return d
+    return d  # xmin,xmax,ymin,ymax,zmin,zmax
 
 
 def _lineout_presets(case, bounds):
@@ -208,139 +187,174 @@ def _lineout_presets(case, bounds):
     cx = 0.5 * (xmin + xmax)
     cy = 0.5 * (ymin + ymax)
     if case == "dmr":
-        # horizontal through lower flow; vertical mid-domain
-        lines = [
+        return [
             ("y_mid", (xmin, cy, 0.0), (xmax, cy, 0.0)),
-            ("x_shock", (cx, ymin, 0.0), (cx, ymax, 0.0)),
+            ("x_mid", (cx, ymin, 0.0), (cx, ymax, 0.0)),
         ]
-    else:
-        # Riemann unit square defaults
-        lines = [
-            ("y_0.5", (xmin, cy, 0.0), (xmax, cy, 0.0)),
-            ("x_0.5", (cx, ymin, 0.0), (cx, ymax, 0.0)),
-        ]
-    return lines
+    return [
+        ("y_0.5", (xmin, cy, 0.0), (xmax, cy, 0.0)),
+        ("x_0.5", (cx, ymin, 0.0), (cx, ymax, 0.0)),
+    ]
 
 
-def _export_lineouts(reader, lines, csv_path, png_path, view, width, height, res):
+def _export_lineouts(reader, lines, csv_path, png_path, width, height, res):
     from paraview.simple import (
         PlotOverLine,
-        Show,
-        Hide,
         UpdatePipeline,
         CreateView,
-        GetActiveViewOrCreate,
+        Show,
         SaveScreenshot,
         Render,
         Delete,
     )
+    from paraview import servermanager as sm
 
     rows = []
     headers = ["line", "s", "x", "y", "rho", "p"]
-    # Use first line for PNG XY chart if available
-    first_plot = None
+    first_pol = None
+
     for name, p0, p1 in lines:
         pol = PlotOverLine(Input=reader)
         pol.Point1 = list(p0)
         pol.Point2 = list(p1)
-        # denser sampling
         try:
             pol.Resolution = 500
         except Exception:
             pass
-        UpdatePipeline()
-        # fetch data via servermanager
+        UpdatePipeline(proxy=pol)
         try:
-            data = pol.GetClientSideObject().GetOutput()
-            # vtkTable or vtkPolyData
-            import vtk
-
-            pdata = pol.GetClientSideObject().GetOutputDataObject(0)
-            # Prefer Fetch
-            from paraview.simple import servermanager as sm
-
             fetcher = sm.Fetch(pol)
-            # vtkPolyData with point data
             n = fetcher.GetNumberOfPoints()
             pd = fetcher.GetPointData()
             arr_rho = pd.GetArray("rho")
             arr_p = pd.GetArray("p")
             for i in range(n):
                 pt = fetcher.GetPoint(i)
-                # arc length param ~ i/(n-1)
                 s = float(i) / max(n - 1, 1)
                 rho = arr_rho.GetValue(i) if arr_rho is not None else float("nan")
                 pr = arr_p.GetValue(i) if arr_p is not None else float("nan")
                 rows.append([name, s, pt[0], pt[1], rho, pr])
         except Exception as e:
-            print("  WARNING: line-out fetch failed for", name, ":", e)
+            print("  WARNING: line-out fetch failed for %s: %s" % (name, e))
 
-        if first_plot is None:
-            first_plot = pol
+        if first_pol is None:
+            first_pol = pol
         else:
             try:
                 Delete(pol)
             except Exception:
                 pass
 
-    # CSV
     with open(csv_path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(headers)
         w.writerows(rows)
-    print("  wrote", csv_path)
+    print("  wrote", csv_path, "(%d samples)" % len(rows))
 
-    # Simple line chart view for first cut if possible
-    if first_plot is not None:
+    if first_pol is None or len(rows) == 0:
+        print("  WARNING: no line-out samples; skip PNG")
+        return
+
+    # Prefer matplotlib if available (cleaner, version-stable)
+    if _lineout_png_matplotlib(rows, png_path, width, height):
+        return
+
+    # Fallback: ParaView XY chart
+    try:
+        chart = CreateView("XYChartView")
+        chart.ViewSize = [width, height]
+        disp = Show(first_pol, chart)
         try:
-            chart = CreateView("XYChartView")
-            chart.ViewSize = [width, height]
-            disp = Show(first_plot, chart)
-            try:
-                disp.SeriesVisibility = ["rho", "p"]
-            except Exception:
-                pass
-            Render(chart)
-            SaveScreenshot(
-                png_path,
-                chart,
-                ImageResolution=[width * res, height * res],
-                OverrideColorPalette="WhiteBackground",
-            )
-            print("  wrote", png_path)
+            disp.SeriesVisibility = ["rho", "p"]
+        except Exception:
+            pass
+        Render(chart)
+        SaveScreenshot(
+            png_path,
+            chart,
+            ImageResolution=[width * res, height * res],
+        )
+        print("  wrote", png_path)
+        try:
             Delete(chart)
-        except Exception as e:
-            print("  WARNING: could not save lineout PNG (CSV is still written):", e)
-            # fallback empty note
-            if not os.path.isfile(png_path):
-                print("  (skip PNG)")
+        except Exception:
+            pass
+    except Exception as e:
+        print("  WARNING: could not save lineout PNG:", e)
+
+
+def _lineout_png_matplotlib(rows, png_path, width, height):
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return False
+
+    # group by line name
+    from collections import OrderedDict
+
+    series = OrderedDict()
+    for name, s, x, y, rho, p in rows:
+        series.setdefault(name, {"s": [], "rho": [], "p": []})
+        series[name]["s"].append(s)
+        series[name]["rho"].append(rho)
+        series[name]["p"].append(p)
+
+    n = len(series)
+    fig_w = max(width / 100.0, 8)
+    fig_h = max(height / 100.0, 3 * n)
+    fig, axes = plt.subplots(n, 1, figsize=(fig_w, fig_h), squeeze=False)
+    for ax, (name, data) in zip(axes[:, 0], series.items()):
+        ax.plot(data["s"], data["rho"], "k-", lw=1.5, label=r"$\rho$")
+        ax.plot(data["s"], data["p"], "C0--", lw=1.2, label=r"$p$")
+        ax.set_xlabel("normalized arc length s")
+        ax.set_ylabel(name)
+        ax.legend(frameon=False, loc="best")
+        ax.grid(True, alpha=0.3)
+        ax.set_title("line-out: %s" % name)
+    fig.tight_layout()
+    fig.savefig(png_path, dpi=150, facecolor="white")
+    plt.close(fig)
+    print("  wrote", png_path, "(matplotlib)")
+    return True
+
+
+def _top_down_camera(view, bounds):
+    """Orthographic top-down view of the XY plane."""
+    xmin, xmax, ymin, ymax = bounds[0], bounds[1], bounds[2], bounds[3]
+    cx = 0.5 * (xmin + xmax)
+    cy = 0.5 * (ymin + ymax)
+    dx = max(xmax - xmin, 1e-12)
+    dy = max(ymax - ymin, 1e-12)
+    try:
+        view.CameraParallelProjection = 1
+        view.CameraPosition = [cx, cy, max(dx, dy) * 3.0]
+        view.CameraFocalPoint = [cx, cy, 0.0]
+        view.CameraViewUp = [0.0, 1.0, 0.0]
+        view.CameraParallelScale = 0.55 * max(dx, dy)
+    except Exception:
+        from paraview.simple import ResetCamera
+
+        ResetCamera(view)
 
 
 def main(argv=None):
     if not _import_paraview():
         return 2
 
+    # Lazy imports after path check — only names present in PV 5.x/6.x simple API
     from paraview.simple import (
         XMLUnstructuredGridReader,
-        GradientOfUnstructuredDataSet,
+        Gradient,
         Calculator,
         Show,
-        Hide,
         UpdatePipeline,
         ColorBy,
-        GetColorTransferFunction,
         Render,
-        ResetCamera,
         Delete,
-        GetActiveViewOrCreate,
     )
-
-    # Gradient filter name differs slightly across versions
-    try:
-        from paraview.simple import Gradient
-        gradient_filter = Gradient
-    except Exception:
-        gradient_filter = GradientOfUnstructuredDataSet
 
     args = parse_args(argv)
     vtu = os.path.abspath(args.vtu)
@@ -354,7 +368,7 @@ def main(argv=None):
 
     print("Reading", vtu)
     reader = XMLUnstructuredGridReader(FileName=[vtu])
-    UpdatePipeline()
+    UpdatePipeline(proxy=reader)
     point_names = _point_array_names(reader)
     cell_names = _cell_array_names(reader)
     print("  PointData:", point_names)
@@ -364,10 +378,10 @@ def main(argv=None):
         print("ERROR: PointData 'rho' required for Schlieren/pressure plots.", file=sys.stderr)
         return 1
 
-    # case preset
     case = args.case
     if case == "auto":
-        case = "dmr" if "double_mach" in os.path.basename(vtu).lower() or "dmr" in prefix.lower() else "riemann"
+        base = os.path.basename(vtu).lower() + " " + prefix.lower()
+        case = "dmr" if ("double_mach" in base or "dmr" in base) else "riemann"
 
     view = _setup_view((args.width, args.height))
     bounds = _bounds(reader)
@@ -381,20 +395,8 @@ def main(argv=None):
         ColorBy(disp, ("POINTS", "p"))
         disp.RescaleTransferFunctionToDataRange(True, False)
         disp.SetScalarBarVisibility(view, True)
-        lut = GetColorTransferFunction("p")
-        try:
-            lut.ApplyPreset("Cool to Warm", True)
-        except Exception:
-            try:
-                lut.ApplyPreset("Viridis (matplotlib)", True)
-            except Exception:
-                pass
-    ResetCamera(view)
-    # slightly pad camera
-    try:
-        view.CameraParallelScale = view.CameraParallelScale * 1.05
-    except Exception:
-        pass
+        _apply_lut("p", ["Cool to Warm", "Viridis (matplotlib)", "Blue to Red Rainbow"])
+    _top_down_camera(view, bounds)
     _save(
         view,
         os.path.join(outdir, "%s_pressure.png" % prefix),
@@ -403,66 +405,57 @@ def main(argv=None):
         args.res,
     )
 
-    # ---- Schlieren |∇ρ| inverted grayscale ----
+    # ---- Schlieren |∇ρ| inverted grayscale (Gradient filter, PV 5/6) ----
     print("Numerical Schlieren…")
     _hide_all(view)
-    grad = gradient_filter(Input=reader)
-    # attribute selection differs by filter version
+    grad = Gradient(Input=reader)
     try:
         grad.ScalarArray = ["POINTS", "rho"]
-    except Exception:
-        try:
-            grad.SelectInputScalars = ["POINTS", "rho"]
-        except Exception:
-            pass
+    except Exception as e:
+        print("  WARNING: could not set Gradient.ScalarArray:", e)
     try:
         grad.ComputeGradient = 1
     except Exception:
         pass
-    UpdatePipeline()
+    try:
+        grad.ResultArrayName = "Gradient"
+    except Exception:
+        pass
+    UpdatePipeline(proxy=grad)
 
-    # Magnitude via Calculator if Result array is vector
-    calc = Calculator(Input=grad)
-    calc.ResultArrayName = "schlieren"
-    # Try common gradient array names
     gnames = _point_array_names(grad)
     gvec = None
-    for cand in ("Gradients", "Gradient", "rhoGradient", "Result"):
+    for cand in ("Gradient", "Gradients", "rhoGradient", "Result"):
         if cand in gnames:
             gvec = cand
             break
-    if gvec is None and gnames:
-        gvec = gnames[-1]
     if gvec is None:
-        print("  WARNING: no gradient array; skipping Schlieren", file=sys.stderr)
+        # pick first multi-component array that is not an original scalar
+        try:
+            info = grad.GetPointDataInformation()
+            for i in range(info.GetNumberOfArrays()):
+                a = info.GetArray(i)
+                if a.GetNumberOfComponents() >= 3 and a.GetName() not in point_names:
+                    gvec = a.GetName()
+                    break
+        except Exception:
+            pass
+
+    if gvec is None:
+        print("  WARNING: no gradient array found; arrays=%s" % gnames, file=sys.stderr)
     else:
+        calc = Calculator(Input=grad)
+        calc.ResultArrayName = "schlieren"
         calc.Function = "mag(%s)" % gvec
-        UpdatePipeline()
+        UpdatePipeline(proxy=calc)
         _hide_all(view)
         d2 = Show(calc, view)
         d2.Representation = "Surface"
         ColorBy(d2, ("POINTS", "schlieren"))
         d2.RescaleTransferFunctionToDataRange(True, False)
         d2.SetScalarBarVisibility(view, True)
-        lut = GetColorTransferFunction("schlieren")
-        try:
-            lut.ApplyPreset("Grayscale", True)
-        except Exception:
-            try:
-                lut.ApplyPreset("X Ray", True)
-            except Exception:
-                pass
-        # Invert so high gradient = black
-        try:
-            lut.InvertTransferFunction()
-        except Exception:
-            pass
-        # Prefer linear scale; clamp high outliers via custom range if needed
-        ResetCamera(view)
-        try:
-            view.CameraParallelScale = view.CameraParallelScale * 1.05
-        except Exception:
-            pass
+        _apply_lut("schlieren", ["Grayscale", "X Ray", "Black-Body Radiation"], invert=True)
+        _top_down_camera(view, bounds)
         _save(
             view,
             os.path.join(outdir, "%s_schlieren.png" % prefix),
@@ -470,6 +463,11 @@ def main(argv=None):
             args.height,
             args.res,
         )
+        try:
+            Delete(calc)
+            Delete(grad)
+        except Exception:
+            pass
 
     # ---- Sensor / AV ----
     print("Sensor / AV field…")
@@ -496,19 +494,8 @@ def main(argv=None):
         ColorBy(d3, (assoc, field))
         d3.RescaleTransferFunctionToDataRange(True, False)
         d3.SetScalarBarVisibility(view, True)
-        lut = GetColorTransferFunction(field)
-        try:
-            lut.ApplyPreset("Plasma (matplotlib)", True)
-        except Exception:
-            try:
-                lut.ApplyPreset("Cool to Warm", True)
-            except Exception:
-                pass
-        ResetCamera(view)
-        try:
-            view.CameraParallelScale = view.CameraParallelScale * 1.05
-        except Exception:
-            pass
+        _apply_lut(field, ["Plasma (matplotlib)", "Cool to Warm", "Rainbow Desaturated"])
+        _top_down_camera(view, bounds)
         _save(
             view,
             os.path.join(outdir, "%s_sensor.png" % prefix),
@@ -525,7 +512,6 @@ def main(argv=None):
         lines,
         os.path.join(outdir, "%s_lineout.csv" % prefix),
         os.path.join(outdir, "%s_lineout.png" % prefix),
-        view,
         args.width,
         args.height,
         args.res,
