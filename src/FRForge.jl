@@ -167,7 +167,9 @@ export SNAPSHOT_SCHEMA_VERSION
 export robustness_cells, scheme_slug, evaluate_robustness_cell, run_robustness_matrix
 export assess_publication_grade, cell_ok, order_preserved, append_robustness_log_entry!
 
-export write_vtu_high_order, vtk_lagrange_line_nodes, vtk_lagrange_quad_nodes
+export write_vtu_high_order, write_vtu_high_order_with_capturing
+export compute_capturing_diagnostics_2d, dissipation_operator
+export vtk_lagrange_line_nodes, vtk_lagrange_quad_nodes
 export vtk_point_counts_1d, vtk_point_counts_2d
 export gl_to_equi_interp, parse_vtu_basic, VTK_LAGRANGE_LINE, VTK_LAGRANGE_QUAD
 

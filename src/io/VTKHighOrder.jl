@@ -301,15 +301,23 @@ function vtk_point_counts_2d(n_elements::Int, p::Int)
 end
 
 """
-    write_vtu_high_order(path, state::SolutionState2D, eq) -> path
+    write_vtu_high_order(path, state::SolutionState2D, eq; cell_fields, point_fields) -> path
 
 Discontinuous high-order VTU with VTK_LAGRANGE_QUAD cells.
+
+Optional:
+- `cell_fields::Dict{String,AbstractVector}` — one value per element (e.g. sensor, av)
+- `point_fields::Dict{String,AbstractVector}` — length `n_pts` extra point arrays
+
+Default PointData: Euler `rho,u,v,p,rho_u,rho_v,E` (no capturing diagnostics).
 """
 function write_vtu_high_order(
     path::AbstractString,
     state::SolutionState2D{T,Neq},
     eq;
     fields::Symbol=:auto,
+    cell_fields::Union{Nothing,AbstractDict}=nothing,
+    point_fields::Union{Nothing,AbstractDict}=nothing,
 ) where {T,Neq}
     mesh, ops = state.mesh, state.ops
     p = ops.p
@@ -369,6 +377,35 @@ function write_vtu_high_order(
         end
     end
 
+    # Optional extra point fields (length n_pts)
+    if point_fields !== nothing
+        for (name, vec) in pairs(point_fields)
+            length(vec) == n_pts ||
+                throw(DimensionMismatch("point field $name length $(length(vec)) != n_pts $n_pts"))
+            field_data[String(name)] = collect(T, vec)
+        end
+    end
+
+    # Optional cell fields (length Nel) — also expanded onto points for easy coloring
+    cell_data = Dict{String,Vector{T}}()
+    if cell_fields !== nothing
+        for (name, vec) in pairs(cell_fields)
+            length(vec) == Nel ||
+                throw(DimensionMismatch("cell field $name length $(length(vec)) != Nel $Nel"))
+            cv = collect(T, vec)
+            cell_data[String(name)] = cv
+            # expand constant-per-element onto Lagrange points (helps continuous Surface)
+            pv = zeros(T, n_pts)
+            @inbounds for e in 1:Nel
+                base = (e - 1) * n_per
+                for a in 1:n_per
+                    pv[base + a] = cv[e]
+                end
+            end
+            field_data[String(name)] = pv
+        end
+    end
+
     mkpath(dirname(abspath(path)))
     open(path, "w") do io
         println(io, "<?xml version=\"1.0\"?>")
@@ -413,8 +450,17 @@ function write_vtu_high_order(
         println(io, "      </Cells>")
         scalar0 = is_euler ? "rho" : "u"
         println(io, "      <PointData Scalars=\"$scalar0\">")
-        names = is_euler ? ("rho", "u", "v", "p", "rho_u", "rho_v", "E") : ("u",)
+        # stable order: defaults first, then extras
+        names = if is_euler
+            String["rho", "u", "v", "p", "rho_u", "rho_v", "E"]
+        else
+            String["u"]
+        end
+        for name in sort(collect(keys(field_data)))
+            name in names || push!(names, name)
+        end
         for name in names
+            haskey(field_data, name) || continue
             println(io, "        <DataArray type=\"Float64\" Name=\"$name\" format=\"ascii\">")
             print(io, "          ")
             v = field_data[name]
@@ -426,9 +472,78 @@ function write_vtu_high_order(
             println(io, "        </DataArray>")
         end
         println(io, "      </PointData>")
+        if !isempty(cell_data)
+            println(io, "      <CellData>")
+            for name in sort(collect(keys(cell_data)))
+                println(io, "        <DataArray type=\"Float64\" Name=\"$name\" format=\"ascii\">")
+                print(io, "          ")
+                v = cell_data[name]
+                for e in 1:Nel
+                    print(io, Float64(v[e]))
+                    e < Nel && print(io, " ")
+                end
+                println(io)
+                println(io, "        </DataArray>")
+            end
+            println(io, "      </CellData>")
+        end
         println(io, "    </Piece>")
         println(io, "  </UnstructuredGrid>")
         println(io, "</VTKFile>")
     end
     return path
+end
+
+"""
+    dissipation_operator(method) -> ElementArtificialViscosity | nothing
+
+Access AV operator for documentation diagnostics only.
+"""
+dissipation_operator(::AbstractCapturingMethod) = nothing
+dissipation_operator(m::PerssonAVMethod) = m.dissip
+dissipation_operator(m::ScaledPerssonMethod) = m.inner.dissip
+
+"""
+    compute_capturing_diagnostics_2d(state, eq, method) -> (sensor, av)
+
+Per-element modal sensor `σ` and artificial viscosity `ε` (zeros if method has no AV).
+For documentation VTU only — not used by invent/CI by default.
+"""
+function compute_capturing_diagnostics_2d(
+    state::SolutionState2D{T},
+    eq,
+    method::AbstractCapturingMethod,
+) where {T}
+    Nel = state.mesh.n_elements
+    σ = zeros(T, Nel)
+    u_work = similar(state.u)
+    preprocess_state!(u_work, method, state, eq)
+    sense!(σ, method, u_work, state, eq)
+    ε = zeros(T, Nel)
+    dissip = dissipation_operator(method)
+    if dissip !== nothing
+        ε = element_viscosities_2d(dissip, σ, u_work, state, eq)
+    end
+    return σ, ε
+end
+
+"""
+    write_vtu_high_order_with_capturing(path, state, eq, method) -> path
+
+2D VTU including element `sensor` and `av` (ε) cell/point fields.
+Documentation / post-processing only.
+"""
+function write_vtu_high_order_with_capturing(
+    path::AbstractString,
+    state::SolutionState2D,
+    eq,
+    method::AbstractCapturingMethod,
+)
+    σ, ε = compute_capturing_diagnostics_2d(state, eq, method)
+    return write_vtu_high_order(
+        path,
+        state,
+        eq;
+        cell_fields=Dict{String,Any}("sensor" => σ, "av" => ε),
+    )
 end

@@ -13,7 +13,8 @@ The laboratory is built so that agents (and humans) can propose **structurally n
 | Shock resolution & overshoots | Capture quality |
 | Positivity & conservation | Robustness / correctness |
 
-Full design blueprint: [`docs/design.md`](docs/design.md).
+Full design blueprint: [`docs/design.md`](docs/design.md).  
+Publication figures from VTU: [`docs/visualization.md`](docs/visualization.md) (local only; not CI).
 
 ---
 

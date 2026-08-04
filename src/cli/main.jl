@@ -139,7 +139,7 @@ function _parse_run_args(args)
     )
     @add_arg_table! s begin
         "--case"
-        help = "Case: advection_sine|…|sod|shu_osher|advection2d|euler2d_wave|euler2d_jump"
+        help = "Case: advection_sine|…|sod|shu_osher|advection2d|euler2d_wave|euler2d_jump|riemann2d|double_mach"
         default = "advection_sine"
         "--p"
         help = "Polynomial degree"
@@ -178,6 +178,14 @@ function _parse_run_args(args)
         help = "Optional high-order VTU output path (ParaView)"
         default = ""
         dest_name = "output"
+        "--vtk-diagnostics"
+        help = "With --output on 2D Euler: write sensor + av cell/point fields (docs only)"
+        action = :store_true
+        dest_name = "vtk_diagnostics"
+        "--ny"
+        help = "Y elements for 2D non-square cases (default: --ne)"
+        arg_type = Int
+        default = 0
     end
     return parse_args(args, s)
 end
@@ -354,11 +362,20 @@ function cli_test(opts::AbstractDict)
 end
 
 """Optionally write high-order VTU if --output is set."""
-function _maybe_write_vtu(opts, state, eq)
+function _maybe_write_vtu(opts, state, eq, method=nothing)
     out = opts["output"]
     if !isempty(out)
-        write_vtu_high_order(out, state, eq)
-        println("VTU written: $(abspath(out))  (open in ParaView ≥ 5.5)")
+        if get(opts, "vtk_diagnostics", false) &&
+           state isa SolutionState2D &&
+           method !== nothing
+            write_vtu_high_order_with_capturing(out, state, eq, method)
+            println(
+                "VTU written (with sensor/av diagnostics): $(abspath(out))  (ParaView ≥ 5.5)",
+            )
+        else
+            write_vtu_high_order(out, state, eq)
+            println("VTU written: $(abspath(out))  (open in ParaView ≥ 5.5)")
+        end
         return true
     end
     return false
@@ -502,7 +519,7 @@ function cli_run(args)
         println(
             "case=euler2d_wave p=$p ne=$(Ne)x$(Ne) t_final=$t_final status=$(result.status) pos=$(positivity_ok(eq, state)) scheme=$(scheme_dict(scheme))",
         )
-        _maybe_write_vtu(opts, state, eq)
+        _maybe_write_vtu(opts, state, eq, method)
         return result.status == :ok ? 0 : 1
     elseif case == "euler2d_jump"
         eq = Euler2D(1.4)
@@ -530,8 +547,53 @@ function cli_run(args)
         println(
             "case=euler2d_jump p=$p ne=$(Ne)x$(Ne) t_final=$tf status=$(result.status) pos=$(positivity_ok(eq, state)) scheme=$(scheme_dict(scheme))",
         )
-        _maybe_write_vtu(opts, state, eq)
+        _maybe_write_vtu(opts, state, eq, method)
         return result.status == :ok ? 0 : 1
+    elseif case == "riemann2d"
+        # 2D Riemann cfg6 — documentation / visualization (default scheme frozen)
+        tf = opts["t_final"] == 1.0 ? 0.12 : opts["t_final"]
+        ny = opts["ny"] > 0 ? opts["ny"] : Ne
+        c, state, eq = run_euler2d_riemann(;
+            p=p,
+            nx=Ne,
+            ny=ny,
+            t_final=tf,
+            cfl=min(cfl, 0.08),
+            config=:cfg6,
+            method=method,
+            method_name=opts["method"],
+        )
+        println(
+            "case=riemann2d cfg6 p=$p ne=$(Ne)x$(ny) t_final=$tf method=$(opts["method"]) pass=$(c["pass"]) pos=$(c["positivity_ok"])",
+        )
+        if !c["diverged"]
+            _maybe_write_vtu(opts, state, eq, method)
+        end
+        return c["pass"] ? 0 : 1
+    elseif case == "double_mach"
+        # Reduced Double-Mach-like (strength=:reduced) — docs / visualization
+        tf = opts["t_final"] == 1.0 ? 0.08 : opts["t_final"]
+        ny = opts["ny"] > 0 ? opts["ny"] : max(div(Ne, 3), 4)
+        c, state, eq = run_double_mach_reflection(;
+            p=p,
+            nx=Ne,
+            ny=ny,
+            t_final=tf,
+            cfl=min(cfl, 0.05),
+            Lx=1.5,
+            Ly=0.5,
+            strength=:reduced,
+            method=method,
+            method_name=opts["method"],
+            require_positivity=false,
+        )
+        println(
+            "case=double_mach reduced p=$p ne=$(Ne)x$(ny) t_final=$tf method=$(opts["method"]) pass=$(c["pass"]) pos=$(c["positivity_ok"])",
+        )
+        if !c["diverged"]
+            _maybe_write_vtu(opts, state, eq, method)
+        end
+        return c["pass"] ? 0 : 1
     else
         println(stderr, "Unknown case: $case")
         return 2
