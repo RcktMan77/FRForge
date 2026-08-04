@@ -3,6 +3,10 @@ uuid = "0ac20233-af1c-4a48-ad94-51810e8bcebb"
 authors = ["RcktMan77"]
 version = "0.1.0"
 
+# Minimal direct deps: CLI (ArgParse), reports (JSON), invent/snapshot stamps
+# (Dates, SHA), linear algebra / BLAS pin for residual threading (LinearAlgebra).
+# No external FR/DG libraries. Manifest.toml is committed for reproducibility.
+
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -12,9 +16,11 @@ SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
 [compat]
 ArgParse = "1"
+Dates = "1.10"
 JSON = "0.21, 1"
 LinearAlgebra = "1.10"
 SHA = "0.7"
+Test = "1.10"
 julia = "1.10"
 
 [extras]
