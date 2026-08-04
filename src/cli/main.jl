@@ -9,7 +9,7 @@ function _print_usage(io=stderr)
     println(io, "  run          Run a single case")
     println(io, "  invent       Run quant suite for a method vs baseline and classify candidate")
     println(io, "  score        Classify two existing JSON reports (method vs baseline)")
-    println(io, "  log          Experiment log: list entries or append from invent reports")
+    println(io, "  log          Experiment log: list|summary|frontier|lessons|show|append")
     println(io, "  robustness   Scheme robustness matrix (CI-light or full/nightly)")
     println(io)
     println(io, "Agent workflow: read research/experiment_log.md before inventing methods.")
@@ -23,6 +23,9 @@ function _print_usage(io=stderr)
     println(io, "  frforge invent --method scaled_persson --baseline persson_av")
     println(io, "  frforge score --method-report a.json --baseline-report b.json")
     println(io, "  frforge log list")
+    println(io, "  frforge log summary")
+    println(io, "  frforge log frontier")
+    println(io, "  frforge log lessons --query c_av")
     println(io, "  frforge robustness --method scaled_persson --matrix ci")
     println(io, "  frforge robustness --method scaled_persson --matrix full   # local/nightly")
     println(io, "  frforge run --case sod --p 2 --ne 64 --method persson_av")
@@ -573,6 +576,69 @@ function _parse_log_args(args)
         opts = parse_args(rest, s)
         opts["sub"] = "list"
         return opts
+    elseif sub == "summary"
+        s = ArgParseSettings(description="Summarize experiment log.", prog="frforge log summary")
+        @add_arg_table! s begin
+            "--path"
+            help = "Path to experiment_log.md"
+            default = ""
+            "--json"
+            help = "Optional path to write machine-readable JSON"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "summary"
+        return opts
+    elseif sub == "frontier"
+        s = ArgParseSettings(description="Frontier / near-miss methods.", prog="frforge log frontier")
+        @add_arg_table! s begin
+            "--path"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "frontier"
+        return opts
+    elseif sub == "lessons"
+        s = ArgParseSettings(description="Index of lessons and weaknesses.", prog="frforge log lessons")
+        @add_arg_table! s begin
+            "--path"
+            default = ""
+            "--query", "-q"
+            help = "Case-insensitive substring filter"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "lessons"
+        return opts
+    elseif sub == "show"
+        s = ArgParseSettings(description="Show one log entry by id.", prog="frforge log show")
+        @add_arg_table! s begin
+            "id"
+            help = "Entry id (### heading)"
+            required = true
+            "--path"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "show"
+        return opts
+    elseif sub == "pareto"
+        s = ArgParseSettings(description="Pareto-style order/dissip/shock table.", prog="frforge log pareto")
+        @add_arg_table! s begin
+            "--path"
+            default = ""
+            "--json"
+            default = ""
+        end
+        opts = parse_args(rest, s)
+        opts["sub"] = "pareto"
+        return opts
     elseif sub == "append"
         s = ArgParseSettings(
             description="Append experiment log entry from two invent JSON reports.",
@@ -609,16 +675,37 @@ function _parse_log_args(args)
     end
 end
 
+function _log_path(opts)
+    p = get(opts, "path", "")
+    return isempty(p) ? default_experiment_log_path() : p
+end
+
+function _maybe_write_json(path::AbstractString, obj)
+    isempty(path) && return nothing
+    mkpath(dirname(path))
+    open(path, "w") do io
+        JSON.print(io, obj, 2)
+    end
+    println("Wrote JSON → $path")
+    return nothing
+end
+
 function cli_log(args)
     opts = _parse_log_args(args)
     sub = opts["sub"]
     if sub == "help"
-        println("Usage: frforge log {list|append} [options]")
-        println("  list    List entry ids in research/experiment_log.md")
-        println("  append  Append from --method-report and --baseline-report")
+        println("Usage: frforge log {list|summary|frontier|pareto|lessons|show|append} [options]")
+        println("  list      List entry ids")
+        println("  summary   Counts, latest per method, narrative TODOs")
+        println("  frontier  Baseline + promising-class + near-miss pass_gates")
+        println("  pareto    Order/dissipation/shock table with non-dominated flags")
+        println("  lessons   Flatten lessons/weaknesses (--query filter)")
+        println("  show <id> Print one full entry")
+        println("  append    Append from invent JSON reports")
+        println("Common: --path log.md  --json out.json")
         return 0
     elseif sub == "list"
-        path = isempty(get(opts, "path", "")) ? default_experiment_log_path() : opts["path"]
+        path = _log_path(opts)
         ids = list_experiment_entry_ids(path)
         println("Experiment log: $path")
         println("n_entries=$(length(ids))")
@@ -626,8 +713,43 @@ function cli_log(args)
             println("  - ", id)
         end
         return 0
+    elseif sub == "summary"
+        entries = parse_experiment_log(_log_path(opts))
+        summary = log_summary(entries)
+        print(format_log_summary_text(summary))
+        _maybe_write_json(get(opts, "json", ""), summary)
+        return 0
+    elseif sub == "frontier"
+        entries = parse_experiment_log(_log_path(opts))
+        rows = log_frontier(entries)
+        print(format_log_frontier_text(rows))
+        _maybe_write_json(get(opts, "json", ""), rows)
+        return 0
+    elseif sub == "pareto"
+        entries = parse_experiment_log(_log_path(opts))
+        rows = log_pareto(entries)
+        print(format_log_pareto_text(rows))
+        _maybe_write_json(get(opts, "json", ""), rows)
+        return 0
+    elseif sub == "lessons"
+        entries = parse_experiment_log(_log_path(opts))
+        q = get(opts, "query", "")
+        rows = log_lessons(entries; query=isempty(q) ? nothing : q)
+        print(format_log_lessons_text(rows))
+        _maybe_write_json(get(opts, "json", ""), rows)
+        return 0
+    elseif sub == "show"
+        entries = parse_experiment_log(_log_path(opts))
+        e = get_experiment_entry(entries, opts["id"])
+        if e === nothing
+            println(stderr, "Entry not found: ", opts["id"])
+            return 1
+        end
+        print(format_log_entry_text(e))
+        _maybe_write_json(get(opts, "json", ""), e)
+        return 0
     elseif sub == "append"
-        path = isempty(get(opts, "path", "")) ? default_experiment_log_path() : opts["path"]
+        path = _log_path(opts)
         met = load_report(opts["method_report"])
         bas = load_report(opts["baseline_report"])
         cmp = classify_candidate(met, bas; δ=opts["delta"], vtk_produced=opts["vtk_produced"])

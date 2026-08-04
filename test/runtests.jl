@@ -19,6 +19,7 @@ using FRForge
     include("test_quant.jl")
     include("test_invent.jl")
     include("test_experiment_log.jl")
+    include("test_log_analytics.jl")
     include("test_schemes.jl")
     include("test_robustness.jl")
     include("test_vtk.jl")

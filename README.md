@@ -40,7 +40,8 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **P3.3a** 2D Riemann + isentropic vortex |
 | **Completed** | **P3.3b** Optional reduced DMR/FFS |
 | **Completed** | **P4** Performance (alloc reduction, numeric fidelity) |
-| Next | Further invent methods / higher-res benchmarks |
+| **In progress** | **P5.1** Experiment-log analytics |
+| Next | **P5.2** Publication / reproducibility snapshots |
 
 ### Milestone roadmap (M0–M8 complete)
 
@@ -66,7 +67,7 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | P3.x | Science/geometry | 2D capturing, curved elements, extra benchmarks |
 | P4 | Performance | Profile / threads after research workflow is stable |
 
-**Agent invent workflow:** (1) read [`research/experiment_log.md`](research/experiment_log.md); (2) implement under `src/methods/`; (3) `frforge invent --method …`; (4) fill hypothesis/lessons if promising+.
+**Agent invent workflow:** (1) read [`research/experiment_log.md`](research/experiment_log.md) and/or `frforge log summary|frontier|lessons`; (2) implement under `src/methods/`; (3) `frforge invent --method …`; (4) fill hypothesis/lessons if promising+; (5) when short-listed, freeze a reproducibility snapshot (P5.2).
 
 ---
 
