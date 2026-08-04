@@ -32,20 +32,26 @@ function sense!(
 
     V = ops.V_legendre
     s0 = sensor.s0_factor * log10(T(max(p, 1)))
+    rws = ensure_residual_workspace!(state)
 
     # Element-local sensor (read-only cached V); parallel when FRFORGE residual threads > 1
     foreach_element(Nel) do e
-        U = Matrix{T}(sensor_field_2d(eq, u_work, e))  # (Np, Np)
-        # û = V^{-1} U V^{-T}
-        Û = V \ U
-        Û = Û / V'
-        e_tot = sum(abs2, Û) + sensor.ε_floor
+        Ubuf, Ûbuf = sensor_scratch_for(rws)
+        Usrc = sensor_field_2d(eq, u_work, e)
+        @inbounds for j in 1:Np, i in 1:Np
+            Ubuf[i, j] = Usrc[i, j]
+        end
+        # û = V^{-1} U V^{-T}  (same ops as before; write into Ûbuf)
+        Ûtmp = V \ Ubuf
+        Ûtmp = Ûtmp / V'
+        copyto!(Ûbuf, Ûtmp)
+        e_tot = sum(abs2, Ûbuf) + sensor.ε_floor
         e_high = zero(T)
         @inbounds for j in 1:Np
-            e_high += Û[Np, j]^2
+            e_high += Ûbuf[Np, j]^2
         end
         @inbounds for i in 1:(Np - 1)
-            e_high += Û[i, Np]^2
+            e_high += Ûbuf[i, Np]^2
         end
         s_e = log10(e_high / e_tot + sensor.ε_floor)
         σ[e] = one(T) / (one(T) + exp(-sensor.κ * (s_e - s0)))

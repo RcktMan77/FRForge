@@ -85,15 +85,22 @@ function physical_flux(eq::Euler1D{T}, U::AbstractVector) where {T}
     return T[ρu, ρu * u + p, (E + p) * u]
 end
 
-function physical_flux(eq::Euler1D{T}, Umat::AbstractMatrix) where {T}
-    Np = size(Umat, 1)
-    F = similar(Umat)
-    @inbounds for j in 1:Np
-        f = physical_flux(eq, @view Umat[j, :])
-        F[j, 1] = f[1]
-        F[j, 2] = f[2]
-        F[j, 3] = f[3]
+function physical_flux!(out::AbstractVector{T}, eq::Euler1D{T}, U::AbstractVector) where {T}
+    # Match allocating physical_flux (same arithmetic order)
+    ρ, ρu, E = U[1], U[2], U[3]
+    u = ρu / ρ
+    p = pressure(eq, U)
+    @inbounds begin
+        out[1] = ρu
+        out[2] = ρu * u + p
+        out[3] = (E + p) * u
     end
+    return out
+end
+
+function physical_flux(eq::Euler1D{T}, Umat::AbstractMatrix) where {T}
+    F = similar(Umat)
+    physical_flux!(F, eq, Umat)
     return F
 end
 

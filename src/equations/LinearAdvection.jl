@@ -20,13 +20,14 @@ function physical_flux(eq::LinearAdvection1D{T}, u::Number) where {T}
 end
 
 """Pointwise physical flux for a field of states (Np, Neq) → (Np, Neq)."""
+function physical_flux!(out::AbstractVector{T}, eq::LinearAdvection1D{T}, u::AbstractVector) where {T}
+    @inbounds out[1] = eq.a * u[1]
+    return out
+end
+
 function physical_flux(eq::LinearAdvection1D{T}, U::AbstractMatrix) where {T}
-    # U is (Np, Neq) with Neq=1
-    Np = size(U, 1)
     F = similar(U)
-    @inbounds for j in 1:Np
-        F[j, 1] = eq.a * U[j, 1]
-    end
+    physical_flux!(F, eq, U)
     return F
 end
 

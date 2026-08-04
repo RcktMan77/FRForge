@@ -261,14 +261,16 @@ function apply_dissipation_br0!(
     D, ℓ_L, ℓ_R = ops.D, ops.ℓ_L, ops.ℓ_R
     gL_ξ, gR_ξ = ops.gL_ξ, ops.gR_ξ
     p = ops.p
-    ε = element_viscosities(dissip, σ, u_work, state, eq)
+    rws = ensure_residual_workspace!(state)
+    b = ensure_br0_workspace_1d!(rws, Np, Nel, Neq)
+    ε = b.ε
+    # fill viscosities into pooled buffer (same values as element_viscosities)
+    ε_new = element_viscosities(dissip, σ, u_work, state, eq)
+    copyto!(ε, ε_new)
 
     # g[j,e,c] viscous flux at SPs; also interface traces of u and g
-    g = zeros(T, Np, Nel, Neq)
-    uL = zeros(T, Nel, Neq)
-    uR = zeros(T, Nel, Neq)
-    gL = zeros(T, Nel, Neq)
-    gR = zeros(T, Nel, Neq)
+    g, uL, uR, gL, gR = b.g, b.uL, b.uR, b.gL, b.gR
+    ghat_L, ghat_R = b.ghat_L, b.ghat_R
 
     @inbounds for e in 1:Nel
         J = mesh.J[e]
@@ -298,10 +300,6 @@ function apply_dissipation_br0!(
             gR[e, c] = s_gR
         end
     end
-
-    # Interface numerical viscous fluxes per element (L/R)
-    ghat_L = zeros(T, Nel, Neq)
-    ghat_R = zeros(T, Nel, Neq)
 
     function br0_flux(e_left::Int, e_right::Int, c::Int)
         # states from left element right face / right element left face

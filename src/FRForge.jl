@@ -142,7 +142,7 @@ export discrete_mass, l2_error
 # --- Equations & fluxes ---
 export AbstractEquation, LinearAdvection1D, Burgers1D, Euler1D
 export LinearAdvection2D, Euler2D
-export physical_flux, physical_flux_x, physical_flux_y, numerical_flux, numerical_flux_n
+export physical_flux, physical_flux!, physical_flux_x, physical_flux_y, numerical_flux, numerical_flux_n
 export max_wave_speed, max_wave_speed_n, n_equations
 export rusanov_flux, hllc_flux, hllc_flux_n, interface_flux, interface_flux_n
 export pressure, velocity, sound_speed, primitives_to_conserved, conserved_to_primitives
@@ -168,25 +168,26 @@ export sample_solution_1d, shock_thickness_sp, excess_dissipation, smooth_region
 export observed_orders, order_pass, solution_extrema, overshoot_metric
 export SodProblem, sod_exact, sod_exact_conserved
 
-# --- Verification cases (1D) ---
-export run_advection_smooth_order, run_advection_conservation, run_m1_advection_suite
-export run_burgers_conservation, run_burgers_oscillation, run_m2_burgers_suite
+# --- Verification cases (1D) — public case runners ---
+export run_advection_smooth_order, run_advection_conservation
+export run_burgers_conservation, run_burgers_oscillation
 export burgers_square_ic
-export run_euler_smooth_order, run_euler_conservation, run_m3_euler_suite
+export run_euler_smooth_order, run_euler_conservation
 export run_bc_transmissive_test, run_bc_dirichlet_test
 export euler_density_wave_conserved
-export run_persson_vs_null_burgers, run_m4_capturing_suite
+export run_persson_vs_null_burgers
 export run_sod, run_shu_osher, run_m5_quant_suite, shu_osher_ic, sod_ic
+# Suite orchestrators (run_m1_… / run_p31_…) are internal: FRForge.run_m1_advection_suite etc.
 
 # --- Verification cases (2D / curved / optional) ---
 export run_advection2d_smooth_order, run_euler2d_smooth_order, run_euler2d_discontinuous
-export run_m8_2d_suite, run_p31_2d_capturing_suite
 export run_freestream_preservation_2d, run_advection2d_curved_order
-export run_euler2d_curved_discontinuous, run_p32_curved_suite
-export riemann2d_ic, riemann2d_cfg3_ic, RIEMANN2D_CFG3, RIEMANN2D_CFG6, run_euler2d_riemann
-export isentropic_vortex_primitives, run_isentropic_vortex_order, run_p33a_benchmark_suite
+export run_euler2d_curved_discontinuous
+export riemann2d_ic, RIEMANN2D_CFG6, run_euler2d_riemann
+export isentropic_vortex_primitives, run_isentropic_vortex_order
 export double_mach_states, double_mach_ic, run_double_mach_reflection
-export make_ffs_solid_mask, run_forward_facing_step, run_p33b_optional_suite
+export make_ffs_solid_mask, run_forward_facing_step
+# run_m8/p31/p32/p33* suites, riemann2d_cfg3_ic / RIEMANN2D_CFG3: internal / research
 
 # --- Invent / score / log / robustness / snapshot / confirm ---
 export invent_method, score_reports, run_method_report
