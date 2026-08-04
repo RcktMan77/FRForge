@@ -31,7 +31,7 @@ function sense!(
     length(σ) == Nel || throw(DimensionMismatch("σ length $(length(σ)) != Nel $Nel"))
 
     V = ops.V_legendre
-    s0 = sensor.s0_factor * log10(T(max(p, 1)))
+    s0 = persson_s0(p, sensor.s0_factor)
     rws = ensure_residual_workspace!(state)
 
     # Element-local sensor (read-only cached V); parallel when FRFORGE residual threads > 1
@@ -53,8 +53,7 @@ function sense!(
         @inbounds for i in 1:(Np - 1)
             e_high += Ûbuf[i, Np]^2
         end
-        s_e = log10(e_high / e_tot + sensor.ε_floor)
-        σ[e] = one(T) / (one(T) + exp(-sensor.κ * (s_e - s0)))
+        σ[e] = persson_sigma(e_high, e_tot, s0, sensor.κ, sensor.ε_floor)
     end
     return σ
 end
@@ -284,10 +283,8 @@ function apply_dissipation_br0_2d!(
         gp = gxW[q, eR, c]
         jxL, _ = element_coords(mesh, eL)
         jxR, _ = element_coords(mesh, eR)
-        εbar = T(0.5) * (ε[eL] + ε[eR])
-        hbar = T(0.5) * (mesh.Δx[jxL] + mesh.Δx[jxR])
-        τ = T(2) * εbar * T(p + 1) / max(hbar, eps(T))
-        return T(0.5) * (gm + gp) - τ * (up - um)
+        τ = br0_tau_1d(ε[eL], ε[eR], mesh.Δx[jxL], mesh.Δx[jxR], p)
+        return br0_avg_flux(gm, gp, um, up, τ)
     end
 
     function br0_y(eB::Int, eT::Int, q::Int, c::Int)
@@ -297,10 +294,8 @@ function apply_dissipation_br0_2d!(
         gp = gyS[q, eT, c]
         _, jyB = element_coords(mesh, eB)
         _, jyT = element_coords(mesh, eT)
-        εbar = T(0.5) * (ε[eB] + ε[eT])
-        hbar = T(0.5) * (mesh.Δy[jyB] + mesh.Δy[jyT])
-        τ = T(2) * εbar * T(p + 1) / max(hbar, eps(T))
-        return T(0.5) * (gm + gp) - τ * (up - um)
+        τ = br0_tau_1d(ε[eB], ε[eT], mesh.Δy[jyB], mesh.Δy[jyT], p)
+        return br0_avg_flux(gm, gp, um, up, τ)
     end
 
     # Interior vertical faces

@@ -10,7 +10,8 @@
 #   snapshot_cmd.jl — snapshot freeze/verify/tables
 #   main.jl         — main_cli dispatcher
 
-const CLI_COMMANDS = ("test", "run", "invent", "score", "confirm", "log", "snapshot", "robustness")
+const CLI_COMMANDS =
+    ("test", "run", "invent", "score", "confirm", "log", "snapshot", "robustness", "tune")
 
 # Keep help strings and error messages in lockstep with `_dispatch_test_suite`.
 const CLI_TEST_SUITE_HELP =
@@ -48,6 +49,7 @@ function _print_usage(io = stderr)
     println(io, "  log          Experiment log: $(join(CLI_LOG_SUBCOMMANDS, "|"))")
     println(io, "  snapshot     Freeze/verify/tables for reproducibility packages")
     println(io, "  robustness   Scheme robustness matrix (CI-light or full/nightly)")
+    println(io, "  tune         Coefficient grid scout (secondary; does not rewrite invent history)")
     println(io)
     println(
         io,

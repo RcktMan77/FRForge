@@ -126,3 +126,18 @@ end
         @test cmp["composite"] > cmp["baseline_composite"]
     end
 end
+
+@testset "tune_coefficient scouts without polluting registry" begin
+    before = Set(list_methods())
+    rows = tune_coefficient(
+        "scaled_persson";
+        param = :c_av,
+        values = [0.1, 0.5],
+        baseline = "persson_av",
+        suite = :light,
+        δ = 0.01,
+    )
+    @test length(rows) == 2
+    @test all(haskey(r, "composite") for r in rows)
+    @test Set(list_methods()) == before
+end
