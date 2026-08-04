@@ -32,9 +32,15 @@ Git before: `b54bd75` (post P3.3b). After: this P4 commit.
 | | Wall (s) | Notes |
 |--|----------|--------|
 | Before P4 (post–P3.2, ~599 tests) | ~492 | Pre–P3.3a/b content; includes compile |
-| After P4 (post–P3.3a/b + perf, ~637 tests) | ~334 | More tests, still faster overall |
+| After P4 (post–P3.3a/b + perf, ~637 tests) | ~334 | More tests, still faster overall (~1.5×) |
 
-## CI
+## CI (GitHub Actions Ubuntu, job wall times)
 
-Full package test wall times: see GHA logs on PRs #33–#35 (Julia 1.10/1.11 Ubuntu).
-Target required CI remains ~10–15 min; P4 should only reduce wall time.
+| Ref | Julia 1.10 | Julia 1.11 | Notes |
+|-----|------------|------------|-------|
+| Pre-P4 (post–P3.2, PR #32 main) | ~14–15 min workflow | same | ~599 tests |
+| P3.3a only (#33) | 13m 41s | 15m 46s | +vortex/Riemann, pre-P4 residual |
+| P3.3b only (#34) | 12m 47s | 11m 17s | +DMR/FFS, pre-P4 residual |
+| **Post-P4 (#35 / #36)** | **8m 18s – 8m 59s** | **11m 13s – 11m 25s** | all of above + alloc opts |
+
+Required CI stays under the **10–15 min** budget; P4 shaves several minutes off the heavier Julia 1.10 path.
