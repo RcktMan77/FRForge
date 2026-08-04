@@ -4,8 +4,8 @@
 |-------|--------|
 | **Title** | FRForge — High-Order Flux Reconstruction Laboratory |
 | **Author** | FRForge maintainers (RcktMan77) |
-| **Date** | 2026-08-03 |
-| **Status** | Approved (with plan-review incorporation, 2026-08-03) |
+| **Date** | 2026-08-03 (current-state section refreshed 2026-08-04) |
+| **Status** | Approved blueprint; implementation complete through P5 + confirm + docs threading |
 | **Repository** | https://github.com/RcktMan77/FRForge.git |
 | **Local path** | `/Users/zdavis/Desktop/FRForge` |
 | **Language / runtime** | Julia ≥ 1.10 (tested on 1.11.7) |
@@ -17,7 +17,7 @@
 
 FRForge is a green-field, self-contained Julia package that implements Flux Reconstruction (FR) schemes for hyperbolic conservation laws, with the primary purpose of inventing and quantitatively evaluating novel shock-capturing / discontinuity-treatment methods. The laboratory is deliberately narrow: start from first-principles 1D FR, enforce machine-readable verification at every step, and keep discontinuity treatment fully pluggable so agents can propose structurally new methods (sensors, residual dissipation, interface reconstruction/limiting, hybrid schemes) rather than only tuning coefficients of a single heuristic.
 
-This document is the implementation blueprint. It fixes package layout, FR operator conventions (including explicit \(g_{DG}\) construction), mesh/state/BC representations, a staged residual hook pipeline for capturing, JSON report schemas with a locked agent scoring contract, CLI surface, high-order VTK strategy (ParaView-safe node ordering), agent invention workflow, Git branching, and an ordered PR plan mapping milestones 0–8. An engineer or agent should be able to implement Milestone 0 immediately from this document and proceed through later milestones without architectural rework.
+This document is the implementation blueprint. It fixes package layout, FR operator conventions (including explicit \(g_{DG}\) construction), mesh/state/BC representations, a staged residual hook pipeline for capturing, JSON report schemas with a locked agent scoring contract, CLI surface, high-order VTK strategy (ParaView-safe node ordering), agent invention workflow, and Git branching. Later sections retain the original M0–M8 / post-M8 phase notes as historical delivery record; the **Current state** subsection above reflects the shipped laboratory.
 
 ---
 
@@ -31,12 +31,12 @@ High-order FR/CPR schemes achieve excellent accuracy in smooth regions but produ
 2. Measure it against a fixed suite: formal order, excess dissipation, shock quality, overshoots, positivity, conservation.
 3. Decide autonomously whether the candidate is better than a classical baseline.
 
-### Current state
+### Current state (implementation status, 2026-08-04)
 
-- Repository exists with a single initial commit (`d500456`) containing only a two-line `README.md`.
-- No solver code, no package skeleton, no CI.
-- Remote: `git@github.com:RcktMan77/FRForge.git`; branch `main` only.
-- Local tree verified: only `README.md`; no existing solver architecture to reuse or contradict.
+- **M0–M8 complete:** 1D/2D FR core, pluggable capturing, quant suite, invent/score, HO VTK, 2D cases.
+- **Post-M8:** experiment log + analytics, scheme axes (GLL/HLLC/SSP-RK2) with **frozen invent defaults GL+Rusanov+SSP-RK3**, robustness matrix, curved quads, 2D Riemann/vortex/optional DMR–FFS, residual alloc optimizations (Phase 4), reproducibility snapshots, fine-mesh `frforge confirm`, optional docs-only residual threading.
+- **Policy:** invent / quant / confirm-for-promotion use **serial** residual (bit-deterministic). Threaded residuals are opt-in for documentation/long local runs only and must not feed invent composite history or official promotion.
+- Remote: `https://github.com/RcktMan77/FRForge.git`. Primary integration branch: `develop` → `main`.
 
 ### Pain points this design addresses
 
@@ -66,11 +66,10 @@ High-order FR/CPR schemes achieve excellent accuracy in smooth regions but produ
 
 ### Non-Goals (explicit)
 
-- Not a production multi-physics CFD code (no Navier–Stokes, chemistry, turbulence models in early milestones).
-- Not performance-oriented initially (no GPU, no aggressive SIMD, no MPI).
+- Not a production multi-physics CFD code (no Navier–Stokes, chemistry, or turbulence models).
+- Not a GPU / MPI / aggressive-SIMD production solver (residual workspaces + optional docs-only threading are the only performance path; invent stays serial).
 - No reuse of personal or external high-order FR/DG libraries (Trixi.jl, StartUpDG.jl, etc. may be read for ideas only; not depended on).
-- No curved-element / high-order geometry support until later milestones.
-- No adaptive mesh refinement (AMR) in milestones 0–8.
+- No general multi-block unstructured CAD meshing or AMR (isoparametric curved quads + solid masks are supported; full industrial geometry is not).
 - Not a full GUI; CLI + JSON + ParaView only.
 - Not a Bayesian/coefficient-tuning lab as the primary invent path (structural code against hooks is primary; coefficient search is secondary).
 
@@ -82,7 +81,7 @@ High-order FR/CPR schemes achieve excellent accuracy in smooth regions but produ
 |---|----------|-----------|
 | K1 | **Single package `FRForge.jl`** with **flat `include`s** into one module (no nested submodules for M0–M7) | Simplest for green-field research; one `Project.toml`, one export surface |
 | K2 | **Concrete 1D types first** (`Mesh1D`, `SolutionState{T,Neq}`); introduce `AbstractMesh{D}` / dimension param only in **M8** when 2D lands. 2D state layout locked to `(Np, Np, Nel, Neq)` | Avoids fake abstraction in M1; no competing 2D layouts |
-| K3 | **GL solution points; discontinuous flux at SPs; continuous flux via left/right interface corrections at \(\xi=\pm 1\)** (Huynh FR / DG recovery via \(g_{DG}\)). GLL collocation is **not** the default; optional later `PointSet` | Matches standard FR verification; avoids false “GLL flux-point” scheme |
+| K3 | **GL solution points; discontinuous flux at SPs; continuous flux via left/right interface corrections at \(\xi=\pm 1\)** (Huynh FR / DG recovery via \(g_{DG}\)). GLL is available via scheme axis but **not** invent default | Matches standard FR verification; invent composite history stays on GL |
 | K4 | **Reference-element operators built once** (`FROperators{T}` with field `p::Int`) and reused | Clarity, testability, fixed discrete operators |
 | K5 | **Staged residual hook pipeline** (preprocess → extrapolate → numerical flux → volume FR → sense/dissipate → post-step); core never names concrete methods | Supports residual-additive **and** reconstruction/limiter/hybrid families without forking residual |
 | K6 | **Split types within the pipeline**: sensor + dissipation for AV family; replaceable extrapolate/flux/post-step for structural novelty | Sensor/dissipation composition remains natural; hooks cover hybrid FR–WENO-class methods |
@@ -161,30 +160,27 @@ FRForge/
 │   ├── fr/
 │   │   ├── Points.jl
 │   │   ├── Operators.jl
-│   │   ├── Correction.jl      # g_DG only in M0–M7; g_Ga later milestone
-│   │   └── Residual.jl        # residual!, interface fluxes, trace assembly (1D)
-│   ├── equations/
-│   │   ├── AbstractEquation.jl
-│   │   ├── LinearAdvection.jl
-│   │   ├── Burgers.jl
-│   │   └── Euler.jl
+│   │   ├── Correction.jl      # g_DG (Legendre/Radau); g_Ga not scheduled
+│   │   ├── Residual.jl        # residual!, interface fluxes (1D)
+│   │   ├── Residual2D.jl      # tensor-product residual + metrics
+│   │   ├── ResidualWorkspace.jl
+│   │   └── Threading.jl       # opt-in docs residual threads
+│   ├── equations/             # 1D + 2D advection / Burgers / Euler
 │   ├── flux/
-│   │   └── Rusanov.jl         # HLL added only when needed
+│   │   ├── Rusanov.jl         # invent default
+│   │   └── HLLC.jl            # robustness / exploration
 │   ├── time/
-│   │   └── SSP_RK3.jl
+│   │   ├── SSP_RK3.jl         # invent default
+│   │   ├── SSP_RK2.jl
+│   │   └── Integrate.jl
 │   ├── capturing/
 │   │   ├── Interfaces.jl      # full hook pipeline + nulls
-│   │   └── PerssonAV.jl       # M4 baseline
+│   │   ├── PerssonAV.jl       # invent baseline (1D)
+│   │   └── PerssonAV2D.jl
 │   ├── methods/
 │   │   └── Registry.jl        # invent methods: file + include + register
-│   ├── verification/
-│   │   ├── Metrics.jl
-│   │   ├── Cases.jl
-│   │   ├── Report.jl
-│   │   └── schema_keys.jl     # required/optional key validator
-│   ├── invent/
-│   │   ├── Experiment.jl
-│   │   └── Scoring.jl
+│   ├── verification/          # Metrics, Cases, Cases2D, Scoring, Report, …
+│   ├── invent/                # Experiment, Candidate, log, Confirm, Snapshot, …
 │   ├── io/
 │   │   └── VTKHighOrder.jl
 │   └── solvestate/
@@ -214,23 +210,19 @@ FRForge/
 ```julia
 module FRForge
 
-using LinearAlgebra, Printf, Dates, Logging
-using JSON
+using LinearAlgebra
+using Base.Threads
 using ArgParse
+using Dates
+using JSON
+using SHA
 
-# dependency order
+# dependency order (flat includes — see src/FRForge.jl for the full list)
+include("scheme/SchemeConfig.jl")
 include("fr/Points.jl")
 include("fr/Correction.jl")
 include("fr/Operators.jl")
-include("mesh/BoundaryConditions.jl")
-include("mesh/Mesh1D.jl")
-include("solvestate/SolutionState.jl")
-include("equations/AbstractEquation.jl")
-include("equations/LinearAdvection.jl")
-include("equations/Burgers.jl")
-include("equations/Euler.jl")
-include("flux/Rusanov.jl")
-include("capturing/Interfaces.jl")   # null hooks from M1
+# … mesh, equations, flux, capturing, residual, time, verification, invent, io, cli …
 include("fr/Residual.jl")            # residual!; needs ops, mesh, eq, capturing
 include("time/SSP_RK3.jl")
 # M4+: include("capturing/PerssonAV.jl")
@@ -278,23 +270,27 @@ end # module
 - **Discontinuous flux** \(f^h\) is evaluated at solution points.
 - **Interface corrections** use the element endpoints \(\xi = \pm 1\) only (Huynh FR). This is **not** a collocation scheme on GLL flux points of size \(p+1\).
 
-Optional later research: `PointSet` enum (`GL`, `GLL`) — **not implemented in M1**.
+Solution-point families are selected via `SchemeConfig.points` / `build_operators(p; points=:gl|:gll)`. **Invent freezes GL**; GLL is available for robustness / exploration only.
 
 #### Discrete operators
 
 ```julia
 struct FROperators{T}
     p::Int
-    ξ::Vector{T}              # GL SPs, length Np = p+1
-    w::Vector{T}              # GL weights on [-1,1]
+    points::Symbol            # :gl | :gll
+    ξ::Vector{T}              # SPs, length Np = p+1
+    w::Vector{T}              # quadrature weights on [-1,1]
     D::Matrix{T}              # d/dξ at SPs, (Np, Np)
     ℓ_L::Vector{T}            # Lagrange basis at ξ=-1
     ℓ_R::Vector{T}            # Lagrange basis at ξ=+1
     gL_ξ::Vector{T}           # g'_DG,L(ξ_j)
     gR_ξ::Vector{T}           # g'_DG,R(ξ_j)
+    gL::Vector{T}             # g_DG,L (tests / diagnostics)
+    gR::Vector{T}             # g_DG,R
+    V_legendre::Matrix{T}     # cached Legendre Vandermonde (modal sensor)
 end
 
-function build_operators(p::Int; T::Type=Float64)::FROperators{T}
+function build_operators(p::Int; points::Symbol=:gl, T::Type=Float64)::FROperators{T}
     ...
 end
 ```
@@ -609,7 +605,7 @@ end
 
 **Critical rule:** `residual!` dispatches only on `AbstractCapturingMethod` / hook functions — never `PerssonAVMethod` by name.
 
-**Residual home:** `src/fr/Residual.jl` owns `residual!`, `allocate_traces`, `compute_interface_fluxes` (BC ghosts + numerical flux assembly). Equation-local physical flux stays in `equations/`; Rusanov in `flux/Rusanov.jl`.
+**Residual home:** `src/fr/Residual.jl` / `Residual2D.jl` own `residual!` and interface flux assembly (workspace-backed `compute_interface_fluxes!`, plus allocating wrapper). Workspaces live in `ResidualWorkspace.jl`. Equation-local physical flux stays in `equations/`; invent default Rusanov in `flux/Rusanov.jl` (HLLC optional).
 
 #### Locked Persson AV baseline algorithm (M4)
 
@@ -714,7 +710,7 @@ end
 - Reads `mesh`/`ops` **only** from `state`.
 - M1 ships `NullCapturing` and always passes `method` (tests use `NullCapturing()`).
 - Convenience: `residual!(du, state, eq) = residual!(du, state, eq, NullCapturing())`.
-- Helpers in the same file: `allocate_traces`, `compute_interface_fluxes` (applies `AbstractBC` + `numerical_flux_method` / default Rusanov).
+- Helpers: `allocate_traces`, `compute_interface_fluxes!` / allocating `compute_interface_fluxes` (applies `AbstractBC` + `numerical_flux_method` / scheme flux).
 
 ---
 
@@ -1284,7 +1280,7 @@ Tensor-product Cartesian FR residual runs the same staged hooks as 1D:
 
 - **Sensor:** 2D Persson modal indicator on ``\\hat{U}=V^{-1}UV^{-T}``; high-mode energy from highest Legendre index in ξ or η.
 - **AV:** element scalar ``\\varepsilon_e = c_{av}\\sigma_e (h/p)\\lambda_{\\max}`` with ``h=\\min(\\Delta x,\\Delta y)``; default **BR0** lift in both directions (`element_local_DD` alternative).
-- **CI tier:** `run_p31_2d_capturing_suite` / `frforge test --suite 2d_capturing` uses reduced meshes; full Double Mach etc. deferred to later Phase 3.
+- **CI tier:** `run_p31_2d_capturing_suite` / `frforge test --suite 2d_capturing` uses reduced meshes; Double Mach / FFS use the optional2d (full/nightly) path.
 - Residual still never hard-wires method type names.
 
 ### 2D benchmarks (Phase 3.3a+)
@@ -1311,9 +1307,9 @@ CLI: `frforge test --suite benchmarks` / `p33a` → `run_p33a_benchmark_suite`.
 
 2D residual supports `Periodic` / `Transmissive` / `Reflecting` / `Dirichlet` / `GhostState` BCs and optional solid-element masks.
 
-### Performance (Phase 4)
+### Performance (Phase 4 + docs threading)
 
-Profile → allocation reduction first; optional threading later. 2D residual reuses face/flux work buffers and in-place Rusanov/physical fluxes within each residual evaluation. Arithmetic order is unchanged (no default threading) so outputs match pre-P4 to floating-point noise. Clarity and invent scheme defaults remain frozen.
+Profile → allocation reduction first. 1D/2D residuals reuse per-state workspaces (traces, fhat, `u_work`, `σ`, BR0 pools) and in-place Rusanov/physical fluxes. Optional multi-thread residual loops (`FRFORGE_THREADS` / docs `--threads`) exist for long local documentation runs only; invent, quant scoring, and confirm-for-promotion **force serial** residual so composite history stays bit-deterministic. Clarity and invent scheme defaults remain frozen.
 
 ### Robustness matrix (Phase 2.3+)
 
@@ -1480,7 +1476,7 @@ main_cli(ARGS) -> Int  # process exit code
 |------|------|
 | Adaptive RK, less code | Extra dep; harder bit-stable teaching residual; capturing often wants fixed SSP-RK3 |
 
-**Decision:** Hand-written SSP-RK3 only for M0–M8.
+**Decision:** Hand-written SSP-RK3 as invent default; SSP-RK2 added post-M8 for robustness axes only (not invent composite history).
 
 ### A8. Single `AbstractCapturingMethod` blob vs split sensor/dissipation
 
@@ -1559,17 +1555,24 @@ main_cli(ARGS) -> Int  # process exit code
 
 ```toml
 name = "FRForge"
-uuid = "<generate-with-UUIDs.uuid4()>"
+uuid = "0ac20233-af1c-4a48-ad94-51810e8bcebb"
 authors = ["RcktMan77"]
 version = "0.1.0"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
 [compat]
 ArgParse = "1"
+Dates = "1.10"
 JSON = "0.21, 1"
+LinearAlgebra = "1.10"
+SHA = "0.7"
+Test = "1.10"
 julia = "1.10"
 
 [extras]
@@ -1578,6 +1581,8 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [targets]
 test = ["Test"]
 ```
+
+**Policy:** keep third-party deps to **ArgParse + JSON** only; declare used stdlibs (`Dates`, `LinearAlgebra`, `SHA`) explicitly. Commit `Manifest.toml` (resolved on the primary local Julia, currently 1.11.x; CI also runs 1.10). No external FR/DG packages.
 
 ---
 
@@ -1656,7 +1661,7 @@ test = ["Test"]
 | OQ2 | CI platforms | **Ubuntu primary/blocking**; macOS first-class locally; optional non-blocking macOS GHA later. |
 | OQ3 | M7 VTK timing | **Allow after M3** for visual debugging; invent loop not blocked by VTK; `accepted_candidate` requires VTK when writer available. |
 
-No open design questions remain that block Milestone 1.
+No open design questions remain that block continuing invent / confirmation work on the frozen scheme.
 
 ---
 
@@ -1673,18 +1678,24 @@ No open design questions remain that block Milestone 1.
 
 ## Appendix A — Residual pseudocode (1D)
 
+Historical sketch of the strong-form residual. Production code reuses
+`ensure_residual_workspace!(state)` buffers instead of per-call `similar`/`zeros`
+and uses `compute_interface_fluxes!`; arithmetic order is the same.
+
 ```julia
 function residual!(du, state, eq, method::AbstractCapturingMethod)
     mesh, ops = state.mesh, state.ops
     Np, Nel, Neq = size(state.u)
-    u_work = similar(state.u)
+    ws = ensure_residual_workspace!(state)
+    u_work = ws.u_work
     preprocess_state!(u_work, method, state, eq)
 
-    traces = allocate_traces(Nel, Neq)  # uL,uR per element
+    traces = ws.traces
     extrapolate_interface!(traces, method, u_work, state, eq)
 
-    fhat = compute_interface_fluxes(traces, mesh, eq, method, state.t)
-    # compute_interface_fluxes applies AbstractBC ghosts at domain ends
+    fhat = compute_interface_fluxes!(ws, traces, mesh, eq, method, state.t;
+                                    flux_kind=state.scheme.flux)
+    # applies AbstractBC ghosts at domain ends
 
     fill!(du, 0)
     for e in 1:Nel
@@ -1699,7 +1710,7 @@ function residual!(du, state, eq, method::AbstractCapturingMethod)
         end
     end
 
-    σ = zeros(eltype(u_work), Nel)
+    σ = ws.σ
     sense!(σ, method, u_work, state, eq)
     apply_dissipation!(du, method, σ, u_work, state, eq)
     return du
