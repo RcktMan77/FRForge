@@ -21,6 +21,16 @@ function physical_flux_y(eq::LinearAdvection2D{T}, u::AbstractVector) where {T}
     return T[eq.ay * u[1]]
 end
 
+function physical_flux_x!(out::AbstractVector{T}, eq::LinearAdvection2D{T}, u::AbstractVector) where {T}
+    @inbounds out[1] = eq.ax * u[1]
+    return out
+end
+
+function physical_flux_y!(out::AbstractVector{T}, eq::LinearAdvection2D{T}, u::AbstractVector) where {T}
+    @inbounds out[1] = eq.ay * u[1]
+    return out
+end
+
 function max_wave_speed_n(eq::LinearAdvection2D, uL, uR, nx, ny)
     return abs(eq.ax * nx + eq.ay * ny)
 end
@@ -31,7 +41,21 @@ end
 
 """Upwind numerical flux in direction n=(nx,ny) for linear advection."""
 function numerical_flux_n(eq::LinearAdvection2D{T}, uL::AbstractVector, uR::AbstractVector, nx, ny) where {T}
+    out = Vector{T}(undef, 1)
+    numerical_flux_n!(out, eq, uL, uR, nx, ny)
+    return out
+end
+
+function numerical_flux_n!(
+    out::AbstractVector{T},
+    eq::LinearAdvection2D{T},
+    uL::AbstractVector,
+    uR::AbstractVector,
+    nx,
+    ny,
+) where {T}
     an = eq.ax * T(nx) + eq.ay * T(ny)
     û = an >= 0 ? uL[1] : uR[1]
-    return T[an * û]
+    @inbounds out[1] = an * û
+    return out
 end
