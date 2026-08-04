@@ -134,9 +134,9 @@ function compute_interface_fluxes(
 end
 
 """Extrapolate discontinuous flux to left/right endpoints: sum_j f_j * ℓ_j(±1)."""
-function extrapolate_flux(f::AbstractMatrix{T}, ℓ::AbstractVector{T}) where {T}
+function extrapolate_flux!(out::AbstractVector{T}, f::AbstractMatrix{T}, ℓ::AbstractVector{T}) where {T}
     Np, Neq = size(f)
-    out = zeros(T, Neq)
+    length(out) == Neq || throw(DimensionMismatch("out length $(length(out)) != Neq $Neq"))
     @inbounds for c in 1:Neq
         s = zero(T)
         for j in 1:Np
@@ -145,6 +145,11 @@ function extrapolate_flux(f::AbstractMatrix{T}, ℓ::AbstractVector{T}) where {T
         out[c] = s
     end
     return out
+end
+
+function extrapolate_flux(f::AbstractMatrix{T}, ℓ::AbstractVector{T}) where {T}
+    out = Vector{T}(undef, size(f, 2))
+    return extrapolate_flux!(out, f, ℓ)
 end
 
 """
@@ -180,11 +185,13 @@ function residual!(
     )
 
     fill!(du, zero(T))
+    f = ws.f_vol
+    fL, fR = ws.f_end_L, ws.f_end_R
     @inbounds for e in 1:Nel
         U = @view u_work[:, e, :]
-        f = physical_flux(eq, U)  # (Np, Neq)
-        fL = extrapolate_flux(f, ops.ℓ_L)
-        fR = extrapolate_flux(f, ops.ℓ_R)
+        physical_flux!(f, eq, U)  # (Np, Neq) into workspace
+        extrapolate_flux!(fL, f, ops.ℓ_L)
+        extrapolate_flux!(fR, f, ops.ℓ_R)
         Je = mesh.J[e]
         for c in 1:Neq
             for j in 1:Np

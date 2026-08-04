@@ -33,6 +33,9 @@ mutable struct ResidualWorkspace2D{T}
     σ::Vector{T}
     face_pool::Vector{FaceScratch2D{T}}
     vol_pool::Vector{VolumeScratch2D{T}}
+    # Persson sensor scratch (per-thread): U and V\\U temporaries
+    sensor_U::Vector{Matrix{T}}
+    sensor_Û::Vector{Matrix{T}}
     # BR0 AV pool (lazy size match)
     br0::Union{Nothing,NamedTuple}
 end
@@ -55,8 +58,15 @@ function ResidualWorkspace2D(::Type{T}, Np::Int, Nel::Int, Neq::Int) where {T}
         zeros(T, Nel),
         [FaceScratch2D(T, Neq) for _ in 1:nthr],
         [VolumeScratch2D(T, Np, Neq) for _ in 1:nthr],
+        [zeros(T, Np, Np) for _ in 1:nthr],
+        [zeros(T, Np, Np) for _ in 1:nthr],
         nothing,
     )
+end
+
+@inline function sensor_scratch_for(ws::ResidualWorkspace2D)
+    tid = min(Threads.threadid(), length(ws.sensor_U))
+    return ws.sensor_U[tid], ws.sensor_Û[tid]
 end
 
 function ensure_residual_workspace!(state::SolutionState2D{T,Neq}) where {T,Neq}
@@ -87,6 +97,11 @@ mutable struct ResidualWorkspace1D{T}
     traces::InterfaceTraces{T}
     u_m::Vector{T}
     u_p::Vector{T}
+    f_vol::Matrix{T}       # (Np, Neq) physical flux scratch
+    f_end_L::Vector{T}     # Neq discontinuous flux at ξ=-1
+    f_end_R::Vector{T}     # Neq discontinuous flux at ξ=+1
+    # 1D BR0 AV pool (lazy)
+    br0::Union{Nothing,NamedTuple}
 end
 
 function ResidualWorkspace1D(::Type{T}, Np::Int, Nel::Int, Neq::Int) where {T}
@@ -101,6 +116,10 @@ function ResidualWorkspace1D(::Type{T}, Np::Int, Nel::Int, Neq::Int) where {T}
         allocate_traces(Nel, Neq, T),
         Vector{T}(undef, Neq),
         Vector{T}(undef, Neq),
+        zeros(T, Np, Neq),
+        Vector{T}(undef, Neq),
+        Vector{T}(undef, Neq),
+        nothing,
     )
 end
 
@@ -112,6 +131,29 @@ function ensure_residual_workspace!(state::SolutionState{T,Neq}) where {T,Neq}
         state.residual_ws = ResidualWorkspace1D(T, Np, Nel, Neq)
     end
     return state.residual_ws::ResidualWorkspace1D{T}
+end
+
+"""1D BR0 AV workspace; stored on ResidualWorkspace1D.br0."""
+function ensure_br0_workspace_1d!(ws::ResidualWorkspace1D{T}, Np::Int, Nel::Int, Neq::Int) where {T}
+    b = ws.br0
+    if b !== nothing && b.Np == Np && b.Nel == Nel && b.Neq == Neq
+        return b
+    end
+    b = (
+        Np=Np,
+        Nel=Nel,
+        Neq=Neq,
+        g=zeros(T, Np, Nel, Neq),
+        uL=zeros(T, Nel, Neq),
+        uR=zeros(T, Nel, Neq),
+        gL=zeros(T, Nel, Neq),
+        gR=zeros(T, Nel, Neq),
+        ghat_L=zeros(T, Nel, Neq),
+        ghat_R=zeros(T, Nel, Neq),
+        ε=zeros(T, Nel),
+    )
+    ws.br0 = b
+    return b
 end
 
 """BR0 AV workspace (large arrays); stored on ResidualWorkspace2D.br0."""

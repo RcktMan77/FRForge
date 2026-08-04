@@ -11,8 +11,23 @@
     end
 end
 
-@testset "serial residual bit-stable (2D)" begin
+@testset "serial residual bit-stable (1D and 2D)" begin
     with_serial_residual() do
+        eq1 = Euler1D(1.4)
+        ops1 = build_operators(2)
+        mesh1 = Mesh1D(0.0, 1.0, 8; left_bc = PeriodicBC(), right_bc = PeriodicBC())
+        st1 = allocate_state(mesh1, ops1, Val(3))
+        set_initial_condition!(
+            st1,
+            x -> primitives_to_conserved(eq1, 1.0 + 0.1 * sin(2π * x), 0.1, 1.0),
+        )
+        m1 = PerssonAVMethod(; c_av = 0.1)
+        d1a = similar(st1.u)
+        d1b = similar(st1.u)
+        residual!(d1a, st1, eq1, m1)
+        residual!(d1b, st1, eq1, m1)
+        @test d1a == d1b
+
         eq = Euler2D(1.4)
         ops = build_operators(2)
         mesh = Mesh2D(0.0, 1.0, 0.0, 1.0, 4, 4)

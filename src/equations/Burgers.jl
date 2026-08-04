@@ -16,13 +16,14 @@ function physical_flux(::Burgers1D, u::Number)
     return 0.5 * float(u)^2
 end
 
+function physical_flux!(out::AbstractVector{T}, ::Burgers1D, u::AbstractVector) where {T}
+    @inbounds out[1] = T(0.5) * u[1] * u[1]
+    return out
+end
+
 function physical_flux(::Burgers1D, U::AbstractMatrix{T}) where {T}
-    Np = size(U, 1)
     F = similar(U)
-    @inbounds for j in 1:Np
-        uj = U[j, 1]
-        F[j, 1] = T(0.5) * uj * uj
-    end
+    physical_flux!(F, Burgers1D(), U)
     return F
 end
 
