@@ -1,4 +1,4 @@
-# FROperators: reference-element discrete operators for 1D FR.
+# FROperators: reference-element discrete operators (GL/GLL SPs + g_DG).
 
 """
     gauss_lobatto_legendre_nodes_weights(n; T=Float64) -> (ξ, w)
@@ -71,13 +71,14 @@ struct FROperators{T}
     gR_ξ::Vector{T}    # g'_DG,R(ξ_j)
     gL::Vector{T}      # g_DG,L(ξ_j) (for tests / diagnostics)
     gR::Vector{T}      # g_DG,R(ξ_j)
+    V_legendre::Matrix{T}  # Vandermonde P_k(ξ_j) for modal sensor (cached)
 end
 
 """
     build_operators(p; points=:gl, T=Float64) -> FROperators{T}
 
 Build nodes/weights, differentiation matrix, Lagrange endpoint values,
-and g_DG correction derivatives (Appendix C).
+and g_DG correction derivatives.
 
 `points`: `:gl` (Gauss–Legendre, default) or `:gll` (Gauss–Lobatto–Legendre).
 """
@@ -94,7 +95,8 @@ function build_operators(p::Int; points::Symbol=:gl, T::Type=Float64)
     ℓ_L = lagrange_at(ξ, -one(T))
     ℓ_R = lagrange_at(ξ, one(T))
     gL, gR, gL_ξ, gR_ξ = g_DG_values_and_derivs(p, ξ)
-    return FROperators{T}(p, points, ξ, w, D, ℓ_L, ℓ_R, gL_ξ, gR_ξ, gL, gR)
+    V = legendre_vandermonde(ξ)
+    return FROperators{T}(p, points, ξ, w, D, ℓ_L, ℓ_R, gL_ξ, gR_ξ, gL, gR, V)
 end
 
 build_operators(p::Int, scheme::SchemeConfig; T::Type=Float64) =

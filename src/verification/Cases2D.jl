@@ -1,4 +1,4 @@
-# Milestone 8 — 2D verification cases.
+# 2D verification cases: Cartesian/curved FR, capturing, Riemann/vortex, optional DMR/FFS.
 
 """
     run_advection2d_smooth_order(; p, n_list, ax, ay, t_final, cfl)
@@ -276,7 +276,7 @@ end
 """
     run_m8_2d_suite() -> (cases, overall, fails, optional_state_for_vtk)
 
-Baseline 2D suite (NullCapturing) plus CI-light 2D capturing checks (Phase 3.1).
+Baseline 2D suite (`NullCapturing`) plus CI-light 2D capturing checks.
 """
 function run_m8_2d_suite()
     cases = Any[]
@@ -300,7 +300,7 @@ function run_m8_2d_suite()
         push!(hard_fails, "2D discontinuous Euler (null) failed")
     end
 
-    # Phase 3.1 CI-light: Persson AV on jump + short smooth with AV on
+    # CI-light: Persson AV on jump + short smooth with AV on
     pers = PerssonAVMethod(; c_av=0.1)
     c4, _, _ = run_euler2d_discontinuous(;
         p=1,
@@ -559,7 +559,7 @@ end
 """
     run_p32_curved_suite() -> (cases, overall, hard_fails)
 
-CI-light curved-element verification suite (Phase 3.2).
+CI-light curved-element verification suite.
 """
 function run_p32_curved_suite()
     cases = Any[]
@@ -663,7 +663,7 @@ function run_p31_2d_capturing_suite()
 end
 
 # ---------------------------------------------------------------------------
-# Phase 3.3a — 2D Riemann + isentropic vortex (CI-light core gates)
+# --- 2D Riemann + isentropic vortex (CI-light core gates) ---
 # ---------------------------------------------------------------------------
 
 """
@@ -742,6 +742,8 @@ function run_euler2d_riemann(;
     method::AbstractCapturingMethod=PerssonAVMethod(; c_av=0.1),
     method_name::AbstractString="persson_av",
     require_positivity::Bool=true,
+    progress_every::Int=0,
+    progress_label::AbstractString="",
 )
     t0 = time()
     eq = Euler2D(γ)
@@ -764,7 +766,11 @@ function run_euler2d_riemann(;
     )
     ρ0 = @view state.u[:, :, :, 1]
     ρmin0, ρmax0 = minimum(ρ0), maximum(ρ0)
-    result = integrate!(state, eq, method, t_final; cfl=cfl)
+    plabel = isempty(progress_label) ? "riemann_$(config)" : progress_label
+    result = integrate!(
+        state, eq, method, t_final;
+        cfl=cfl, progress_every=progress_every, progress_label=plabel,
+    )
     diverged = result.status != :ok
     nan_det = diverged || has_nonfinite(state.u)
     pos = !nan_det && positivity_ok(eq, state)
@@ -970,8 +976,8 @@ end
 """
     run_p33a_benchmark_suite() -> (cases, overall, hard_fails)
 
-CI-light Phase 3.3a suite: 2D Riemann + isentropic vortex order.
-**Required CI.** Double Mach / FFS are P3.3b (full/nightly only).
+CI-light suite: 2D Riemann + isentropic vortex order.
+Double Mach / FFS live in the optional2d suite (full/nightly).
 """
 function run_p33a_benchmark_suite()
     cases = Any[]
@@ -1030,8 +1036,8 @@ function run_p33a_benchmark_suite()
 end
 
 # ---------------------------------------------------------------------------
-# Phase 3.3b — Optional reduced Double Mach + Forward-Facing Step
-# Not Phase 3 gates; CI tier = full/nightly (unit tests use ultra-light configs).
+# --- Optional reduced Double Mach + Forward-Facing Step ---
+# Full/nightly tier (unit tests use ultra-light configs).
 # ---------------------------------------------------------------------------
 
 """
@@ -1073,8 +1079,7 @@ Reduced Double-Mach-like reflection (inclined shock + reflecting wall).
 Default `strength=:reduced` is HO-stable on coarse meshes. Classic Ms=10 via
 `strength=:classic` (research / fine meshes only).
 
-**CI tier:** full/nightly only (not a Phase 3 gate).
-Pass: finite, non-diverged; positivity optional on ultra-coarse meshes.
+**CI tier:** full/nightly (optional2d). Pass: finite, non-diverged; positivity optional on ultra-coarse meshes.
 """
 function run_double_mach_reflection(;
     p::Int=1,
@@ -1090,6 +1095,8 @@ function run_double_mach_reflection(;
     method::AbstractCapturingMethod=PerssonAVMethod(; c_av=0.15),
     method_name::AbstractString="persson_av",
     require_positivity::Bool=false,
+    progress_every::Int=0,
+    progress_label::AbstractString="",
 )
     t0 = time()
     eq = Euler2D(γ)
@@ -1120,7 +1127,11 @@ function run_double_mach_reflection(;
     set_initial_condition!(
         state, (x, y) -> double_mach_ic(eq, x, y; x_shock0=x_shock0, strength=strength),
     )
-    result = integrate!(state, eq, method, t_final; cfl=cfl)
+    plabel = isempty(progress_label) ? "double_mach_$(strength)" : progress_label
+    result = integrate!(
+        state, eq, method, t_final;
+        cfl=cfl, progress_every=progress_every, progress_label=plabel,
+    )
     diverged = result.status != :ok
     nan_det = diverged || has_nonfinite(state.u)
     pos = !nan_det && positivity_ok(eq, state)
@@ -1157,7 +1168,7 @@ function run_double_mach_reflection(;
             "ρ_max" => nan_det ? NaN : maximum(ρ),
             "method_params" => method_params(method),
             "ci_tier" => "full_nightly",
-            "note" => "optional reduced Double Mach-like; not a Phase 3 gate",
+            "note" => "optional reduced Double Mach-like (full/nightly tier)",
         ),
     ),
     state,
@@ -1284,7 +1295,7 @@ function run_forward_facing_step(;
             "M_in" => M_in,
             "method_params" => method_params(method),
             "ci_tier" => "full_nightly",
-            "note" => "optional reduced FFS via solid mask; not a Phase 3 gate",
+            "note" => "optional reduced FFS via solid mask (full/nightly tier)",
         ),
     ),
     state,

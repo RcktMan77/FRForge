@@ -22,16 +22,19 @@ using ArgParse
 """Presentation vs quick (smoke) mesh presets. Polynomial degree and t_final match baseline docs."""
 function apply_preset!(opts, preset::AbstractString)
     if preset == "presentation"
-        # Noticeably finer than CI-light (cfg6 CI uses ~16² p=1; DMR CI ~12×4)
-        opts["riemann_n"] = 80
+        # High-fidelity README/presentation meshes (much finer than CI-light).
+        # Dense enough that HO tessellation + ResampleToImage hide element banding
+        # on Cartesian Riemann shocks/contacts. Same p and t_final as prior docs baseline.
+        # CI: Riemann ~16² p=1; DMR ~16×4.
+        opts["riemann_n"] = 192
         opts["riemann_p"] = 2
         opts["riemann_t"] = 0.15
-        opts["riemann_cfl"] = 0.05
-        opts["dmr_nx"] = 120
-        opts["dmr_ny"] = 40
+        opts["riemann_cfl"] = 0.035
+        opts["dmr_nx"] = 280
+        opts["dmr_ny"] = 100
         opts["dmr_p"] = 1
         opts["dmr_t"] = 0.08
-        opts["dmr_cfl"] = 0.035
+        opts["dmr_cfl"] = 0.025
     elseif preset == "quick"
         opts["riemann_n"] = 32
         opts["riemann_p"] = 2
@@ -106,6 +109,15 @@ function parse_cli(args)
         arg_type = Float64
         default = NaN
         dest_name = "dmr_t"
+        "--threads"
+        help = "Opt-in residual threads (docs only; not for invent scores). Needs julia -t N."
+        arg_type = Int
+        default = 0
+        "--progress-every"
+        help = "Print progress every N SSP-RK3 steps (0 = auto when mesh is large)"
+        arg_type = Int
+        default = -1
+        dest_name = "progress_every"
     end
     opts = parse_args(args, s)
     # materialize preset then apply explicit overrides
@@ -135,6 +147,19 @@ function main(args=ARGS)
     outdir = opts["outdir"]
     mkpath(outdir)
 
+    # Docs-only threading: 0 → env FRFORGE_THREADS or 1; N → with_frforge_threads(N)
+    thr = opts["threads"]
+    thr = thr > 0 ? thr : frforge_thread_count()  # respect env if already set
+    if opts["threads"] > 0
+        thr = opts["threads"]
+    end
+
+    # Auto progress for large meshes (avoid "is it stuck?" anxiety)
+    pe = opts["progress_every"]
+    if pe < 0
+        pe = (opts["riemann_n"] >= 48 || opts["dmr_nx"] >= 64) ? 200 : 0
+    end
+
     println("=== Documentation VTU driver (preset=$(opts["preset"])) ===")
     println("method=$method_name  outdir=$outdir  tag=$tag")
     println("scheme=GL+Rusanov+SSP-RK3 (frozen invent defaults; not reconfigured)")
@@ -144,63 +169,77 @@ function main(args=ARGS)
     println(
         "DMR:     p=$(opts["dmr_p"]) nx=$(opts["dmr_nx"]) ny=$(opts["dmr_ny"]) t=$(opts["dmr_t"]) cfl=$(opts["dmr_cfl"])",
     )
-
-    # --- 1) Riemann cfg6 ---
-    println("\n--- 2D Riemann cfg6 ---")
-    t0 = time()
-    c_r, state_r, eq_r = run_euler2d_riemann(;
-        p=opts["riemann_p"],
-        nx=opts["riemann_n"],
-        ny=opts["riemann_n"],
-        t_final=opts["riemann_t"],
-        cfl=opts["riemann_cfl"],
-        config=:cfg6,
-        method=method,
-        method_name=method_name,
+    println(
+        "Threaded residuals are for local documentation runs only; invent composite scores and promotion decisions always use the serial residual.",
     )
-    path_r = joinpath(outdir, "riemann_cfg6_$(tag).vtu")
-    if c_r["diverged"] || c_r["nan_detected"]
-        @error "Riemann run failed" pass = c_r["pass"] diverged = c_r["diverged"]
-    else
-        write_vtu_high_order_with_capturing(path_r, state_r, eq_r, method)
-        println(
-            "pass=$(c_r["pass"]) pos=$(c_r["positivity_ok"]) wall=$(round(time()-t0;digits=1))s → $path_r",
-        )
-    end
 
-    # --- 2) Reduced Double Mach ---
-    println("\n--- Double Mach (strength=:reduced) ---")
-    t0 = time()
-    c_d, state_d, eq_d = run_double_mach_reflection(;
-        p=opts["dmr_p"],
-        nx=opts["dmr_nx"],
-        ny=opts["dmr_ny"],
-        t_final=opts["dmr_t"],
-        cfl=opts["dmr_cfl"],
-        Lx=1.5,
-        Ly=0.5,
-        strength=:reduced,
-        method=method,
-        method_name=method_name,
-        require_positivity=false,
-    )
-    path_d = joinpath(outdir, "double_mach_$(tag).vtu")
-    if c_d["diverged"] || c_d["nan_detected"]
-        @error "DMR run failed" pass = c_d["pass"] diverged = c_d["diverged"]
-    else
-        write_vtu_high_order_with_capturing(path_d, state_d, eq_d, method)
+    return with_frforge_threads(max(1, thr)) do
         println(
-            "pass=$(c_d["pass"]) pos=$(c_d["positivity_ok"]) wall=$(round(time()-t0;digits=1))s → $path_d",
+            "residual threads: $(frforge_thread_count())  (julia nthreads=$(Threads.nthreads()); use julia -t N)",
         )
-    end
+        pe > 0 && println("progress_every: $pe steps")
 
-    println("\nDone. Generate figures with:")
-    println("  export PVPYTHON=/Applications/ParaView-6.1.0.app/Contents/bin/pvpython")
-    println("  \$PVPYTHON scripts/docs/paraview/plot_2d_publication.py \\")
-    println("    --vtu $path_r --outdir results/docs_figures --prefix riemann_cfg6_$(tag) --case riemann")
-    println("  \$PVPYTHON scripts/docs/paraview/plot_2d_publication.py \\")
-    println("    --vtu $path_d --outdir results/docs_figures --prefix double_mach_$(tag) --case dmr")
-    return 0
+        # --- 1) Riemann cfg6 ---
+        println("\n--- 2D Riemann cfg6 ---")
+        t0 = time()
+        c_r, state_r, eq_r = run_euler2d_riemann(;
+            p=opts["riemann_p"],
+            nx=opts["riemann_n"],
+            ny=opts["riemann_n"],
+            t_final=opts["riemann_t"],
+            cfl=opts["riemann_cfl"],
+            config=:cfg6,
+            method=method,
+            method_name=method_name,
+            progress_every=pe,
+            progress_label="riemann_cfg6",
+        )
+        path_r = joinpath(outdir, "riemann_cfg6_$(tag).vtu")
+        if c_r["diverged"] || c_r["nan_detected"]
+            @error "Riemann run failed" pass = c_r["pass"] diverged = c_r["diverged"]
+        else
+            write_vtu_high_order_with_capturing(path_r, state_r, eq_r, method)
+            println(
+                "pass=$(c_r["pass"]) pos=$(c_r["positivity_ok"]) wall=$(round(time()-t0;digits=1))s → $path_r",
+            )
+        end
+
+        # --- 2) Reduced Double Mach ---
+        println("\n--- Double Mach (strength=:reduced) ---")
+        t0 = time()
+        c_d, state_d, eq_d = run_double_mach_reflection(;
+            p=opts["dmr_p"],
+            nx=opts["dmr_nx"],
+            ny=opts["dmr_ny"],
+            t_final=opts["dmr_t"],
+            cfl=opts["dmr_cfl"],
+            Lx=1.5,
+            Ly=0.5,
+            strength=:reduced,
+            method=method,
+            method_name=method_name,
+            require_positivity=false,
+            progress_every=pe,
+            progress_label="double_mach",
+        )
+        path_d = joinpath(outdir, "double_mach_$(tag).vtu")
+        if c_d["diverged"] || c_d["nan_detected"]
+            @error "DMR run failed" pass = c_d["pass"] diverged = c_d["diverged"]
+        else
+            write_vtu_high_order_with_capturing(path_d, state_d, eq_d, method)
+            println(
+                "pass=$(c_d["pass"]) pos=$(c_d["positivity_ok"]) wall=$(round(time()-t0;digits=1))s → $path_d",
+            )
+        end
+
+        println("\nDone. Generate figures with:")
+        println("  export PVPYTHON=/Applications/ParaView-6.1.0.app/Contents/bin/pvpython")
+        println("  \$PVPYTHON scripts/docs/paraview/plot_2d_publication.py \\")
+        println("    --vtu $path_r --outdir results/docs_figures --prefix riemann_cfg6_$(tag) --case riemann")
+        println("  \$PVPYTHON scripts/docs/paraview/plot_2d_publication.py \\")
+        println("    --vtu $path_d --outdir results/docs_figures --prefix double_mach_$(tag) --case dmr")
+        return 0
+    end
 end
 
 if abspath(PROGRAM_FILE) == abspath(@__FILE__)

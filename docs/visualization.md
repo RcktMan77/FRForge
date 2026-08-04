@@ -41,13 +41,38 @@ For a candidate: same scripts, change `--method` / VTU tag (e.g. `scaled_persson
 
 ### 1. Generate presentation VTU (Julia)
 
-From the repository root. **`--preset presentation`** uses meshes finer than CI-light
+From the repository root. **`--preset presentation`** uses meshes much finer than CI-light
 (same \(p\) and \(t_f\) as the documentation baseline). Not used by invent or required CI.
 
 | Case | Presentation mesh | \(p\) | \(t_f\) | CI-light (for comparison) |
 |------|-------------------|------|---------|---------------------------|
-| Riemann cfg6 | \(80\times 80\) | 2 | 0.15 | \(16\times 16\), \(p=1\), \(t=0.08\) |
-| DMR reduced | \(120\times 40\) | 1 | 0.08 | \(16\times 4\), \(t=0.03\) |
+| Riemann cfg6 | \(192\times 192\) | 2 | 0.15 | \(16\times 16\), \(p=1\), \(t=0.08\) |
+| DMR reduced | \(280\times 100\) | 1 | 0.08 | \(16\times 4\), \(t=0.03\) |
+
+Wall-clock (Apple Silicon, single process, rough): Riemann \(192^2\) can be **~60–90+ min** serial; DMR adds more.
+Use `--preset quick` for a fast smoke of the pipeline.
+
+**Threaded residuals are for local documentation runs only; invent composite scores and promotion decisions always use the serial residual.**
+
+```bash
+# Optional: multi-threaded residual (needs julia -t N; not invent-score-safe)
+julia -t 8 --project=. scripts/docs/run_vtu_cases.jl \
+  --preset presentation --threads 8 --tag baseline
+```
+
+Long runs print progress every N SSP-RK3 steps (`--progress-every`, auto-enabled on large meshes).
+
+**Why so fine?** FR/DG fields are discontinuous across faces. On a coarse Cartesian mesh,
+raw VTU rendering (and even mild HO tessellation) shows horizontal/vertical bands —
+especially Schlieren \(\lvert\nabla\rho\rvert\) when gradients hit face jumps. Dense
+presentation meshes + ParaView tessellation + **ResampleToImage** make those artifacts
+sub-pixel for README figures. This does **not** change invent defaults or CI gates.
+
+ParaView post-processing defaults (see `plot_2d_publication.py`):
+
+- Tessellate HO Lagrange cells: `--subdiv` default **8**, tight chord/field error, `MergePoints=0`
+- **ResampleToImage** before pressure/Schlieren/sensor (auto **1600** Riemann / **2000** DMR on longest axis)
+- Gradient of density on the continuous resampled field (avoids mesh-aligned face spikes)
 
 ```bash
 # Baseline (Persson AV) — presentation quality
@@ -77,29 +102,34 @@ VTU includes `rho`, `p`, … plus **`sensor`** and **`av`** via
 
 ### 2. Generate images (`pvpython`)
 
-The script **tessellates** HO Lagrange cells, computes Schlieren on the refined field,
-uses percentile-based contrast, tight framing, and high-resolution PNGs.
+The script **tessellates** HO Lagrange cells, **resamples** to a fine image grid,
+computes Schlieren on the continuous density field, uses percentile-based contrast,
+tight framing, and high-resolution PNGs.
 
 ```bash
 # macOS — ParaView app pvpython (tested: 6.1.0)
 export PVPYTHON="/Applications/ParaView-6.1.0.app/Contents/bin/pvpython"
 
-# Riemann
+# Riemann (defaults: --subdiv 8, auto image-res 1600)
 $PVPYTHON scripts/docs/paraview/plot_2d_publication.py \
   --vtu results/docs_vtu/riemann_cfg6_baseline.vtu \
   --outdir results/docs_figures \
   --prefix riemann_cfg6_baseline \
   --case riemann \
-  --subdiv 4 --schlieren-pct 99 --res 3
+  --schlieren-pct 98 --res 3
 
-# Double Mach
+# Double Mach (auto image-res 2000)
 $PVPYTHON scripts/docs/paraview/plot_2d_publication.py \
   --vtu results/docs_vtu/double_mach_baseline.vtu \
   --outdir results/docs_figures \
   --prefix double_mach_baseline \
   --case dmr \
-  --subdiv 4 --schlieren-pct 99 --res 3
+  --schlieren-pct 98 --res 3
 ```
+
+If residual banding remains on an older coarse VTU, raise sampling further, e.g.
+`--subdiv 10 --image-res 2048` (memory and time grow quickly).
+
 ### 3. Candidate method (same pipeline)
 
 ```bash
@@ -119,9 +149,9 @@ $PVPYTHON scripts/docs/paraview/plot_2d_publication.py \
 
 | File | Content |
 |------|---------|
-| `riemann_cfg6_baseline_schlieren.png` | Numerical Schlieren \(\lvert\nabla\rho\rvert\), inverted grayscale |
+| `riemann_cfg6_baseline_schlieren.png` | Numerical Schlieren \(\lvert\nabla\rho\rvert\), white→black |
 | `riemann_cfg6_baseline_pressure.png` | Pressure field |
-| `riemann_cfg6_baseline_sensor.png` | Modal sensor \(\sigma\) (Cell/Point `sensor`) |
+| `riemann_cfg6_baseline_sensor.png` | Modal sensor \(\sigma\) (resampled) |
 | `riemann_cfg6_baseline_lineout.png` | Density/pressure cuts (\(y=1/2\), \(x=1/2\)) |
 | `riemann_cfg6_baseline_lineout.csv` | Line-out samples |
 
@@ -139,9 +169,25 @@ All written under `--outdir` (e.g. `results/docs_figures/`). Copy into `docs/ima
 
 ---
 
+## Artifact notes (banding / blockiness)
+
+| Cause | Mitigation in this pipeline |
+|-------|----------------------------|
+| DG face discontinuities | Tessellate (`MergePoints=0`) + **ResampleToImage** before display/gradient |
+| Schlieren on discontinuous \(\rho\) | Gradient after continuous resample |
+| Cartesian mesh alignment (Riemann) | Dense presentation mesh (\(192^2\)) so faces are fine vs features |
+| Element-wise sensor | Resample sensor to image for README crops |
+| Under-sampled HO interior | `--subdiv 8` + tight chord/field error |
+
+Residual weak banding near strong axis-aligned waves can remain (true under-resolved
+structure + mild AV oscillations); further mesh refinement is the physics-side fix,
+not invent-scheme changes.
+
+---
+
 ## Notes
 
 - **CI:** do not run these cases or `pvpython` in required CI.
 - **Resolution:** driver defaults are denser than CI-light gates; edit flags for higher quality (cost grows quickly in 2D HO).
-- **Color:** Schlieren uses inverted grayscale; pressure/sensor use colorblind-friendly presets when available in your ParaView build (`Cool to Warm`, `Plasma`).
-- **Schlieren in pure ParaView GUI:** open VTU → *Gradient* of `rho` → *Calculator* `mag(Gradients)` → grayscale LUT inverted.
+- **Color:** Schlieren uses white→black grayscale; pressure/sensor use colorblind-friendly presets when available (`Cool to Warm`, `Plasma`).
+- **Schlieren in pure ParaView GUI:** open VTU → *Tessellate* → *Resample to Image* → *Gradient* of `rho` → *Calculator* `mag(Gradient)` → grayscale LUT white→black.

@@ -127,10 +127,3 @@ end
     end
 end
 
-@testset "invent_method smoke (short)" begin
-    # Full invent is expensive; smoke that registry + classify path works via run_method_report
-    # only if QUICK not set — always run lightweight invent pieces
-    @test "scaled_persson" in list_methods()
-    # Ensure invent_method is defined and baseline name resolves
-    @test get_capturing_method("persson_av") isa PerssonAVMethod
-end

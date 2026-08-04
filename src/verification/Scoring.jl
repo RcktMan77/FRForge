@@ -11,7 +11,7 @@ clip01(x) = clamp(float(x), 0.0, 1.0)
     score_suite_absolute(cases) -> Dict{String,Float64}
 
 Compute S_order, S_diss, S_shock, S_robust, composite from a vector of case dicts
-using absolute maps (no baseline). Used by `frforge test` M5 reports.
+using absolute maps (no baseline). Used by quant/test reports and invent absolute scores.
 """
 function score_suite_absolute(cases::AbstractVector)
     # Order
@@ -75,8 +75,8 @@ end
 """
     apply_scores!(report; baseline=nothing)
 
-Fill `report["summary"]["scores"]` using absolute maps (baseline ignored in M5;
-relative maps used in M6 invent).
+Fill `report["summary"]["scores"]` using absolute maps.
+(Relative maps are applied in invent classification, not here.)
 """
 function apply_scores!(report::AbstractDict; baseline=nothing)
     cases = get(report, "cases", Any[])

@@ -1,5 +1,5 @@
-# 2D extensions for Persson modal sensor + element artificial viscosity (Phase 3.1).
-# Cartesian tensor-product elements; residual never names PerssonAVMethod.
+# 2D Persson modal sensor + element artificial viscosity (Cartesian / curved quads).
+# Used by invent baseline and docs; residual never names PerssonAVMethod.
 
 """Sensor scalar field on element `e`: density for Euler2D, first component otherwise."""
 function sensor_field_2d(::Euler2D, u_work::AbstractArray{T,4}, e::Int) where {T}
@@ -30,21 +30,21 @@ function sense!(
     Nel = size(u_work, 3)
     length(σ) == Nel || throw(DimensionMismatch("σ length $(length(σ)) != Nel $Nel"))
 
-    V = legendre_vandermonde(ops.ξ)
+    V = ops.V_legendre
     s0 = sensor.s0_factor * log10(T(max(p, 1)))
 
-    @inbounds for e in 1:Nel
+    # Element-local sensor (read-only cached V); parallel when FRFORGE residual threads > 1
+    foreach_element(Nel) do e
         U = Matrix{T}(sensor_field_2d(eq, u_work, e))  # (Np, Np)
         # û = V^{-1} U V^{-T}
         Û = V \ U
         Û = Û / V'
         e_tot = sum(abs2, Û) + sensor.ε_floor
-        # Highest mode index Np in either direction
         e_high = zero(T)
-        for j in 1:Np
+        @inbounds for j in 1:Np
             e_high += Û[Np, j]^2
         end
-        for i in 1:(Np - 1)
+        @inbounds for i in 1:(Np - 1)
             e_high += Û[i, Np]^2
         end
         s_e = log10(e_high / e_tot + sensor.ε_floor)
@@ -141,16 +141,16 @@ function apply_dissipation_local_DD_2d!(
     Neq = size(u_work, 4)
     D = ops.D
     ε = element_viscosities_2d(dissip, σ, u_work, state, eq)
-    v = zeros(T, Np)
-    @inbounds for e in 1:Nel
+    v_pool = make_vector_scratch_pool(T, Np)
+    foreach_element(Nel) do e
         εe = ε[e]
-        εe <= zero(T) && continue
+        εe <= zero(T) && return
+        v = vector_scratch_for(v_pool)
         jx, jy = element_coords(mesh, e)
         Jx, Jy = mesh.Jx[jx], mesh.Jy[jy]
         sx = εe / (Jx * Jx)
         sy = εe / (Jy * Jy)
-        for c in 1:Neq
-            # ξ second derivative for each fixed η (j)
+        @inbounds for c in 1:Neq
             for j in 1:Np
                 for i in 1:Np
                     s = zero(T)
@@ -167,7 +167,6 @@ function apply_dissipation_local_DD_2d!(
                     du[i, j, e, c] += sx * s
                 end
             end
-            # η second derivative for each fixed ξ (i)
             for i in 1:Np
                 for j in 1:Np
                     s = zero(T)
@@ -214,26 +213,19 @@ function apply_dissipation_br0_2d!(
     p = ops.p
     ε = element_viscosities_2d(dissip, σ, u_work, state, eq)
 
-    # Viscous fluxes at SPs
-    gx = zeros(T, Np, Np, Nel, Neq)
-    gy = zeros(T, Np, Np, Nel, Neq)
+    rws = ensure_residual_workspace!(state)
+    b = ensure_br0_workspace!(rws, Np, Nel, Neq)
+    gx, gy = b.gx, b.gy
+    uW, uE, uS, uN = b.uW, b.uE, b.uS, b.uN
+    gxW, gxE, gyS, gyN = b.gxW, b.gxE, b.gyS, b.gyN
+    ghat_W, ghat_E, ghat_S, ghat_N = b.ghat_W, b.ghat_E, b.ghat_S, b.ghat_N
 
-    # Face traces of u and g for each element face (along face SPs)
-    # Vertical faces: length Np (η), Horizontal: length Np (ξ)
-    uW = zeros(T, Np, Nel, Neq)
-    uE = zeros(T, Np, Nel, Neq)
-    uS = zeros(T, Np, Nel, Neq)
-    uN = zeros(T, Np, Nel, Neq)
-    gxW = zeros(T, Np, Nel, Neq)
-    gxE = zeros(T, Np, Nel, Neq)
-    gyS = zeros(T, Np, Nel, Neq)
-    gyN = zeros(T, Np, Nel, Neq)
-
-    @inbounds for e in 1:Nel
+    # Element-local gx/gy + face traces (parallel-safe writes)
+    foreach_element(Nel) do e
         jx, jy = element_coords(mesh, e)
         Jx, Jy = mesh.Jx[jx], mesh.Jy[jy]
         εe = ε[e]
-        for c in 1:Neq
+        @inbounds for c in 1:Neq
             for j in 1:Np, i in 1:Np
                 dξ = zero(T)
                 dη = zero(T)
@@ -244,7 +236,6 @@ function apply_dissipation_br0_2d!(
                 gx[i, j, e, c] = εe * dξ / Jx
                 gy[i, j, e, c] = εe * dη / Jy
             end
-            # Face traces via Lagrange
             for j in 1:Np
                 suW = zero(T)
                 suE = zero(T)
@@ -279,11 +270,6 @@ function apply_dissipation_br0_2d!(
             end
         end
     end
-
-    ghat_W = zeros(T, Np, Nel, Neq)
-    ghat_E = zeros(T, Np, Nel, Neq)
-    ghat_S = zeros(T, Np, Nel, Neq)
-    ghat_N = zeros(T, Np, Nel, Neq)
 
     function br0_x(eL::Int, eR::Int, q::Int, c::Int)
         um = uE[q, eL, c]

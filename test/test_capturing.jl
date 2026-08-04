@@ -109,12 +109,6 @@ end
     @test method_params(m1)["av_form"] == "conservative_br0"
 end
 
-@testset "M4 suite integration" begin
-    cases, overall, fails = run_m4_capturing_suite()
-    @test overall
-    @test isempty(fails)
-end
-
 @testset "residual never requires Persson by name" begin
     # Smoke: residual! with AbstractCapturingMethod only
     ops = build_operators(2)

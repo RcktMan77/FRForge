@@ -116,7 +116,8 @@ function evaluate_robustness_cell(
 end
 
 """
-    assess_publication_grade(cells; narrative_complete=false, invent_status=nothing) -> Dict
+    assess_publication_grade(cells; narrative_complete=false, invent_status=nothing,
+                             confirm_passed=false) -> Dict
 
 Promotion rule (all must hold for `eligible=true`):
 
@@ -125,6 +126,8 @@ Promotion rule (all must hold for `eligible=true`):
 2. **HLLC cells** (less-dissipative flux): all `ok` with order preserved.
 3. **GLL cells**: all `ok` (no catastrophic failure).
 4. **`narrative_complete`**: hypothesis + lessons filled (caller responsibility).
+5. **`confirm_passed`**: fine-mesh `frforge confirm` status is `confirmed`
+   (short-list on coarse invent alone is not enough for publication_grade).
 
 Does **not** auto-promote; returns an assessment for the log / agents.
 """
@@ -132,6 +135,7 @@ function assess_publication_grade(
     cells::AbstractVector;
     narrative_complete::Bool=false,
     invent_status::Union{Nothing,AbstractString}=nothing,
+    confirm_passed::Bool=false,
 )
     rules = Dict{String,Any}[]
     default_cells = filter(c -> _is_default_scheme(c), cells)
@@ -178,6 +182,18 @@ function assess_publication_grade(
             "id" => "narrative_complete",
             "ok" => narrative_complete,
             "notes" => narrative_complete ? "hypothesis+lessons provided" : "hypothesis/lessons incomplete",
+        ),
+    )
+
+    # Rule 5: fine-mesh confirm
+    push!(
+        rules,
+        Dict(
+            "id" => "fine_mesh_confirm",
+            "ok" => confirm_passed,
+            "notes" => confirm_passed ?
+                       "frforge confirm passed (confirmed)" :
+                       "missing fine-mesh confirm — run frforge confirm after short-list",
         ),
     )
 
@@ -260,15 +276,13 @@ function run_robustness_matrix(
         met = cell["method_report"]
         bas = cell["baseline_report"]
         cmp = cell["comparison"]
+        # Per-cell slug is unique; keep historical filenames (not invent trio layout).
         met_path = joinpath(out_root, "method_$(slug).json")
         bas_path = joinpath(out_root, "baseline_$(slug).json")
         cmp_path = joinpath(out_root, "compare_$(slug).json")
         write_report(met_path, met)
         write_report(bas_path, bas)
-        open(cmp_path, "w") do io
-            JSON.print(io, cmp, 2)
-            println(io)
-        end
+        write_json_pretty(cmp_path, cmp)
         slim = Dict{String,Any}(
             "scheme" => cell["scheme"],
             "scheme_slug" => slug,
@@ -297,11 +311,23 @@ function run_robustness_matrix(
         )
     end
 
+    conf_ok, conf_note = method_has_confirm_pass(method_name)
     promotion = assess_publication_grade(
         cell_results;
         narrative_complete=narrative_complete,
         invent_status=invent_status,
+        confirm_passed=conf_ok,
     )
+    # attach note for agents
+    for r in promotion["rules"]
+        if r["id"] == "fine_mesh_confirm"
+            r["notes"] = conf_note
+            r["ok"] = conf_ok
+        end
+    end
+    promotion["eligible"] = all(r -> r["ok"] === true, promotion["rules"])
+    promotion["recommended_status"] =
+        promotion["eligible"] ? "publication_grade" : "robustness_pending"
 
     summary = Dict{String,Any}(
         "schema_version" => SCHEMA_VERSION,
@@ -320,10 +346,7 @@ function run_robustness_matrix(
     )
 
     summary_path = joinpath(out_root, "summary.json")
-    open(summary_path, "w") do io
-        JSON.print(io, summary, 2)
-        println(io)
-    end
+    write_json_pretty(summary_path, summary)
     println("Summary: $summary_path")
     println(
         "Promotion: eligible=$(promotion["eligible"]) → $(promotion["recommended_status"])",

@@ -93,8 +93,7 @@ end
     f_h = hllc_flux(eq, uL, uR)
     @test length(f_h) == 3
     @test all(isfinite, f_h)
-    # HLLC should not be identical to Rusanov in general
-    @test f_h != f_r || true  # allow coincidence; mainly finite
+    @test all(isfinite, f_r)
     # Stationary contact: equal pressure and velocity, density jump
     uLc = primitives_to_conserved(eq, 1.0, 0.0, 1.0)
     uRc = primitives_to_conserved(eq, 0.1, 0.0, 1.0)

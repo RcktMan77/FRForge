@@ -1,4 +1,4 @@
-# Candidate status classification vs baseline (design M6).
+# Candidate status classification vs baseline (invent / score).
 
 """
     score_suite_relative(method_cases, baseline_cases) -> Dict

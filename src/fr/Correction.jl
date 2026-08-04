@@ -1,4 +1,4 @@
-# g_DG left/right correction functions via Legendre/Radau construction (Appendix C).
+# g_DG left/right correction functions (Legendre/Radau) + Legendre Vandermonde.
 
 """
     legendre_P(k, ξ) -> P_k(ξ)
@@ -47,7 +47,7 @@ end
 """
     g_DG_values_and_derivs(p, ξ) -> (gL, gR, gL_ξ, gR_ξ)
 
-Construct g_L, g_R and their derivatives at solution points ξ (Appendix C):
+Construct g_L, g_R and their derivatives at solution points ξ:
 
   r_R = P_{p+1} - P_p   (vanishes at +1)
   r_L = P_{p+1} + P_p   (vanishes at -1)
@@ -83,6 +83,20 @@ function g_DG_values_and_derivs(p::Int, ξ::AbstractVector{T}) where {T}
     end
 
     return gL, gR, gL_ξ, gR_ξ
+end
+
+"""
+    legendre_vandermonde(ξ) -> V
+
+V[j,k] = P_{k-1}(ξ_j) for k=1..Np (modal basis for Persson sensor).
+"""
+function legendre_vandermonde(ξ::AbstractVector{T}) where {T}
+    Np = length(ξ)
+    V = zeros(T, Np, Np)
+    @inbounds for j in 1:Np, k in 1:Np
+        V[j, k] = legendre_P(k - 1, ξ[j])
+    end
+    return V
 end
 
 """

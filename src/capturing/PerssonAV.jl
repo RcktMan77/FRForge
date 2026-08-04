@@ -1,4 +1,4 @@
-# Persson–Peraire modal sensor + element-local artificial viscosity (M4 baseline).
+# Persson–Peraire modal sensor + element-local artificial viscosity (invent baseline).
 
 """
     PerssonSensor{T}
@@ -94,22 +94,6 @@ function apply_dissipation!(du, method::PerssonAVMethod, σ, u_work, state, eq)
     return apply_dissipation!(du, method.dissip, σ, u_work, state, eq)
 end
 
-# --- Legendre Vandermonde on GL nodes ---
-
-"""
-    legendre_vandermonde(ξ) -> V
-
-V[j,k] = P_{k-1}(ξ_j) for k=1..Np (modal basis).
-"""
-function legendre_vandermonde(ξ::AbstractVector{T}) where {T}
-    Np = length(ξ)
-    V = zeros(T, Np, Np)
-    @inbounds for j in 1:Np, k in 1:Np
-        V[j, k] = legendre_P(k - 1, ξ[j])
-    end
-    return V
-end
-
 """Sensor scalar field: density for Euler, first component otherwise."""
 function sensor_field(::Euler1D, u_work::AbstractArray{T,3}, e::Int) where {T}
     return @view u_work[:, e, 1]
@@ -131,8 +115,8 @@ function sense!(σ::AbstractVector{T}, sensor::PerssonSensor{T}, u_work, state, 
     Nel = size(u_work, 2)
     length(σ) == Nel || throw(DimensionMismatch("σ length $(length(σ)) != Nel $Nel"))
 
-    V = legendre_vandermonde(ops.ξ)
-    # Modal coeffs û = V \\ u  (solve once per element)
+    V = ops.V_legendre
+    # Modal coeffs û = V \\ u  (same algorithm; V cached on operators)
     s0 = sensor.s0_factor * log10(T(max(p, 1)))
 
     @inbounds for e in 1:Nel

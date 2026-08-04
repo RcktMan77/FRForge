@@ -1,21 +1,11 @@
 # Tensor-product 2D FR residual with metric terms (Cartesian or curved quads).
-# Phase 4: buffer reuse / in-place fluxes — numerics unchanged (same arithmetic order).
+# In-place physical/interface fluxes; residual workspaces reuse face/volume arrays
+# across residual calls. Serial path keeps fixed arithmetic order (bit-stable).
 
-"""
-Extrapolate solution to one face of the reference element.
+"""In-place face trace into `out` of size (Np, Neq).
 
 face ∈ (:west, :east, :south, :north) corresponding to ξ=-1, ξ=+1, η=-1, η=+1.
-Returns matrix (Np, Neq) of face traces along the face SPs.
 """
-function face_trace(u_e, ops::FROperators{T}, face::Symbol) where {T}
-    Np = size(u_e, 1)
-    Neq = size(u_e, 3)
-    out = zeros(T, Np, Neq)
-    face_trace!(out, u_e, ops, face)
-    return out
-end
-
-"""In-place face trace into `out` of size (Np, Neq)."""
 function face_trace!(out::AbstractMatrix{T}, u_e, ops::FROperators{T}, face::Symbol) where {T}
     Np = size(u_e, 1)
     Neq = size(u_e, 3)
@@ -55,29 +45,6 @@ function face_trace!(out::AbstractMatrix{T}, u_e, ops::FROperators{T}, face::Sym
         error("unknown face $face")
     end
     return out
-end
-
-"""
-Contravariant fluxes at a solution point:
-  F̃ =  y_η F_x - x_η F_y
-  G̃ = -y_ξ F_x + x_ξ F_y
-"""
-@inline function contravariant_fluxes(
-    Fx::AbstractVector{T},
-    Gy::AbstractVector{T},
-    x_ξ::T,
-    x_η::T,
-    y_ξ::T,
-    y_η::T,
-) where {T}
-    Neq = length(Fx)
-    Ft = Vector{T}(undef, Neq)
-    Gt = Vector{T}(undef, Neq)
-    @inbounds for c in 1:Neq
-        Ft[c] = y_η * Fx[c] - x_η * Gy[c]
-        Gt[c] = -y_ξ * Fx[c] + x_ξ * Gy[c]
-    end
-    return Ft, Gt
 end
 
 @inline function _copy_comp!(dest::AbstractVector{T}, src, e::Int, q::Int, Neq::Int) where {T}
@@ -157,8 +124,9 @@ Metric-aware 2D strong-form FR residual (Cartesian or curved) with capturing hoo
 Supports Periodic / Transmissive / Reflecting / Dirichlet / GhostState BCs and
 optional solid-element masks (forward-facing step etc.).
 
-Phase 4: reuses work buffers within a residual evaluation; arithmetic order matches
-the pre-optimization residual (no threading by default → bit-stable results).
+Reuses per-state residual workspaces (traces, fhat, σ, u_work) and in-place flux
+kernels. Serial residual path preserves fixed loop order for bit-determinism;
+optional multi-thread volume/traces/sensor via `FRFORGE_THREADS` (docs only).
 """
 function residual!(
     du::AbstractArray{T,4},
@@ -175,18 +143,19 @@ function residual!(
     t = state.t
     has_solid = mesh.solid !== nothing
 
-    u_work = similar(state.u)
+    ws = ensure_residual_workspace!(state)
+    u_work = ws.u_work
     preprocess_state!(u_work, method, state, eq)
 
     fill!(du, zero(T))
 
-    # Face solution traces (one allocation set per residual call)
-    trW = zeros(T, Np, Neq, Nel)
-    trE = zeros(T, Np, Neq, Nel)
-    trS = zeros(T, Np, Neq, Nel)
-    trN = zeros(T, Np, Neq, Nel)
-    @inbounds for e in 1:Nel
-        has_solid && is_solid(mesh, e) && continue
+    trW, trE, trS, trN = ws.trW, ws.trE, ws.trS, ws.trN
+    fhat_W, fhat_E, fhat_S, fhat_N = ws.fhat_W, ws.fhat_E, ws.fhat_S, ws.fhat_N
+    vol_pool = ws.vol_pool
+
+    # Face solution traces (element-local → parallel-safe)
+    foreach_element(Nel) do e
+        has_solid && is_solid(mesh, e) && return
         u_e = @view u_work[:, :, e, :]
         face_trace!(@view(trW[:, :, e]), u_e, ops, :west)
         face_trace!(@view(trE[:, :, e]), u_e, ops, :east)
@@ -194,54 +163,47 @@ function residual!(
         face_trace!(@view(trN[:, :, e]), u_e, ops, :north)
     end
 
-    fhat_W = zeros(T, Np, Neq, Nel)
-    fhat_E = zeros(T, Np, Neq, Nel)
-    fhat_S = zeros(T, Np, Neq, Nel)
-    fhat_N = zeros(T, Np, Neq, Nel)
-
     flux_kind = state.scheme.flux
     wall = ReflectingBC()
+    # Serial face path uses thread-1 scratch (bit-stable loop order when thr=1)
+    sc0 = ws.face_pool[1]
+    u_m, u_p, ug, fh = sc0.u_m, sc0.u_p, sc0.ug, sc0.fh
 
-    # Scratch (reused for all faces / volume points)
-    u_m = Vector{T}(undef, Neq)
-    u_p = Vector{T}(undef, Neq)
-    ug = Vector{T}(undef, Neq)
-    fh = Vector{T}(undef, Neq)
-    Fx = Vector{T}(undef, Neq)
-    Gy = Vector{T}(undef, Neq)
-    Ft = zeros(T, Np, Np, Neq)
-    Gt = zeros(T, Np, Np, Neq)
-
-    # Interior vertical faces
-    @inbounds for jy in 1:ny, jx in 1:(nx - 1)
+    # Interior vertical faces (each face owns unique fhat slots → parallel-safe)
+    n_vfaces = ny * (nx - 1)
+    foreach_element(n_vfaces) do iface
+        jy = div(iface - 1, nx - 1) + 1
+        jx = mod(iface - 1, nx - 1) + 1
         eL = element_index(mesh, jx, jy)
         eR = element_index(mesh, jx + 1, jy)
         sL = has_solid && is_solid(mesh, eL)
         sR = has_solid && is_solid(mesh, eR)
-        (sL && sR) && continue
-        for q in 1:Np
+        (sL && sR) && return
+        sc = face_scratch_for(ws)
+        um, up, ugh, fhh = sc.u_m, sc.u_p, sc.ug, sc.fh
+        @inbounds for q in 1:Np
             nnx, nny, sJ = met.nx_E[q, eL], met.ny_E[q, eL], met.sJ_E[q, eL]
             if sL && !sR
-                _copy_comp!(u_m, trW, eR, q, Neq)
+                _copy_comp!(um, trW, eR, q, Neq)
                 x, y = physical_xy(mesh, eR, -one(T), ops.ξ[q])
                 boundary_fhat!(
-                    fhat_W, q, eR, eq, wall, u_m,
+                    fhat_W, q, eR, eq, wall, um,
                     met.nx_W[q, eR], met.ny_W[q, eR], met.sJ_W[q, eR],
-                    x, y, t, flux_kind, true, ug, fh,
+                    x, y, t, flux_kind, true, ugh, fhh,
                 )
             elseif sR && !sL
-                _copy_comp!(u_m, trE, eL, q, Neq)
+                _copy_comp!(um, trE, eL, q, Neq)
                 x, y = physical_xy(mesh, eL, one(T), ops.ξ[q])
                 boundary_fhat!(
-                    fhat_E, q, eL, eq, wall, u_m, nnx, nny, sJ,
-                    x, y, t, flux_kind, false, ug, fh,
+                    fhat_E, q, eL, eq, wall, um, nnx, nny, sJ,
+                    x, y, t, flux_kind, false, ugh, fhh,
                 )
             else
-                _copy_comp!(u_m, trE, eL, q, Neq)
-                _copy_comp!(u_p, trW, eR, q, Neq)
-                interface_flux_n!(fh, eq, u_m, u_p, nnx, nny, flux_kind)
+                _copy_comp!(um, trE, eL, q, Neq)
+                _copy_comp!(up, trW, eR, q, Neq)
+                interface_flux_n!(fhh, eq, um, up, nnx, nny, flux_kind)
                 for c in 1:Neq
-                    val = fh[c] * sJ
+                    val = fhh[c] * sJ
                     fhat_E[q, c, eL] = val
                     fhat_W[q, c, eR] = val
                 end
@@ -289,36 +251,41 @@ function residual!(
         end
     end
 
-    # Interior horizontal faces
-    @inbounds for jy in 1:(ny - 1), jx in 1:nx
+    # Interior horizontal faces (face-parallel when residual threads > 1)
+    n_hfaces = (ny - 1) * nx
+    foreach_element(n_hfaces) do iface
+        jy = div(iface - 1, nx) + 1
+        jx = mod(iface - 1, nx) + 1
         eB = element_index(mesh, jx, jy)
         eT = element_index(mesh, jx, jy + 1)
         sB = has_solid && is_solid(mesh, eB)
         sT = has_solid && is_solid(mesh, eT)
-        (sB && sT) && continue
-        for q in 1:Np
+        (sB && sT) && return
+        sc = face_scratch_for(ws)
+        um, up, ugh, fhh = sc.u_m, sc.u_p, sc.ug, sc.fh
+        @inbounds for q in 1:Np
             nnx, nny, sJ = met.nx_N[q, eB], met.ny_N[q, eB], met.sJ_N[q, eB]
             if sB && !sT
-                _copy_comp!(u_m, trS, eT, q, Neq)
+                _copy_comp!(um, trS, eT, q, Neq)
                 x, y = physical_xy(mesh, eT, ops.ξ[q], -one(T))
                 boundary_fhat!(
-                    fhat_S, q, eT, eq, wall, u_m,
+                    fhat_S, q, eT, eq, wall, um,
                     met.nx_S[q, eT], met.ny_S[q, eT], met.sJ_S[q, eT],
-                    x, y, t, flux_kind, true, ug, fh,
+                    x, y, t, flux_kind, true, ugh, fhh,
                 )
             elseif sT && !sB
-                _copy_comp!(u_m, trN, eB, q, Neq)
+                _copy_comp!(um, trN, eB, q, Neq)
                 x, y = physical_xy(mesh, eB, ops.ξ[q], one(T))
                 boundary_fhat!(
-                    fhat_N, q, eB, eq, wall, u_m, nnx, nny, sJ,
-                    x, y, t, flux_kind, false, ug, fh,
+                    fhat_N, q, eB, eq, wall, um, nnx, nny, sJ,
+                    x, y, t, flux_kind, false, ugh, fhh,
                 )
             else
-                _copy_comp!(u_m, trN, eB, q, Neq)
-                _copy_comp!(u_p, trS, eT, q, Neq)
-                interface_flux_n!(fh, eq, u_m, u_p, nnx, nny, flux_kind)
+                _copy_comp!(um, trN, eB, q, Neq)
+                _copy_comp!(up, trS, eT, q, Neq)
+                interface_flux_n!(fhh, eq, um, up, nnx, nny, flux_kind)
                 for c in 1:Neq
-                    val = fh[c] * sJ
+                    val = fhh[c] * sJ
                     fhat_N[q, c, eB] = val
                     fhat_S[q, c, eT] = val
                 end
@@ -366,65 +333,71 @@ function residual!(
         end
     end
 
-    # Volume residual (reuse Ft, Gt; in-place physical fluxes)
-    @inbounds for e in 1:Nel
-        has_solid && is_solid(mesh, e) && continue
-        for j in 1:Np, i in 1:Np
-            Uij = @view u_work[i, j, e, :]
-            physical_flux_x!(Fx, eq, Uij)
-            physical_flux_y!(Gy, eq, Uij)
-            xξ, xη = met.x_ξ[i, j, e], met.x_η[i, j, e]
-            yξ, yη = met.y_ξ[i, j, e], met.y_η[i, j, e]
-            for c in 1:Neq
-                Ft[i, j, c] = yη * Fx[c] - xη * Gy[c]
-                Gt[i, j, c] = -yξ * Fx[c] + xξ * Gy[c]
-            end
-        end
-
-        for j in 1:Np
-            for c in 1:Neq
-                fL = zero(T)
-                fR = zero(T)
-                for i in 1:Np
-                    fL += ℓ_L[i] * Ft[i, j, c]
-                    fR += ℓ_R[i] * Ft[i, j, c]
-                end
-                for i in 1:Np
-                    vol = zero(T)
-                    for k in 1:Np
-                        vol += D[i, k] * Ft[k, j, c]
-                    end
-                    corr =
-                        (fhat_W[j, c, e] - fL) * gL[i] + (fhat_E[j, c, e] - fR) * gR[i]
-                    Je = met.J[i, j, e]
-                    du[i, j, e, c] -= (vol + corr) / Je
+    # Volume residual (element-local writes to du; per-thread Ft/Gt/Fx/Gy)
+    foreach_element(Nel) do e
+        has_solid && is_solid(mesh, e) && return
+        sc = volume_scratch_for(vol_pool)
+        Fx, Gy, Ft, Gt = sc.Fx, sc.Gy, sc.Ft, sc.Gt
+        @inbounds begin
+            for j in 1:Np, i in 1:Np
+                Uij = @view u_work[i, j, e, :]
+                physical_flux_x!(Fx, eq, Uij)
+                physical_flux_y!(Gy, eq, Uij)
+                xξ, xη = met.x_ξ[i, j, e], met.x_η[i, j, e]
+                yξ, yη = met.y_ξ[i, j, e], met.y_η[i, j, e]
+                for c in 1:Neq
+                    Ft[i, j, c] = yη * Fx[c] - xη * Gy[c]
+                    Gt[i, j, c] = -yξ * Fx[c] + xξ * Gy[c]
                 end
             end
-        end
 
-        for i in 1:Np
-            for c in 1:Neq
-                gS = zero(T)
-                gN = zero(T)
-                for j in 1:Np
-                    gS += ℓ_L[j] * Gt[i, j, c]
-                    gN += ℓ_R[j] * Gt[i, j, c]
-                end
-                for j in 1:Np
-                    vol = zero(T)
-                    for k in 1:Np
-                        vol += D[j, k] * Gt[i, k, c]
+            for j in 1:Np
+                for c in 1:Neq
+                    fL = zero(T)
+                    fR = zero(T)
+                    for i in 1:Np
+                        fL += ℓ_L[i] * Ft[i, j, c]
+                        fR += ℓ_R[i] * Ft[i, j, c]
                     end
-                    corr =
-                        (fhat_S[i, c, e] - gS) * gL[j] + (fhat_N[i, c, e] - gN) * gR[j]
-                    Je = met.J[i, j, e]
-                    du[i, j, e, c] -= (vol + corr) / Je
+                    for i in 1:Np
+                        vol = zero(T)
+                        for k in 1:Np
+                            vol += D[i, k] * Ft[k, j, c]
+                        end
+                        corr =
+                            (fhat_W[j, c, e] - fL) * gL[i] +
+                            (fhat_E[j, c, e] - fR) * gR[i]
+                        Je = met.J[i, j, e]
+                        du[i, j, e, c] -= (vol + corr) / Je
+                    end
+                end
+            end
+
+            for i in 1:Np
+                for c in 1:Neq
+                    gS = zero(T)
+                    gN = zero(T)
+                    for j in 1:Np
+                        gS += ℓ_L[j] * Gt[i, j, c]
+                        gN += ℓ_R[j] * Gt[i, j, c]
+                    end
+                    for j in 1:Np
+                        vol = zero(T)
+                        for k in 1:Np
+                            vol += D[j, k] * Gt[i, k, c]
+                        end
+                        corr =
+                            (fhat_S[i, c, e] - gS) * gL[j] +
+                            (fhat_N[i, c, e] - gN) * gR[j]
+                        Je = met.J[i, j, e]
+                        du[i, j, e, c] -= (vol + corr) / Je
+                    end
                 end
             end
         end
     end
 
-    σ = zeros(T, Nel)
+    σ = ws.σ
     sense!(σ, method, u_work, state, eq)
     if has_solid
         @inbounds for e in 1:Nel

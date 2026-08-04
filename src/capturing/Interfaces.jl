@@ -6,7 +6,7 @@
 #   3. numerical_flux_method    — optional flux override (else equation default)
 #   4. FR volume + DG correction (fixed core; not replaceable via hooks)
 #   5. sense! + apply_dissipation!  — AV / residual filters
-#   6. post_step! (after full SSP-RK3 step) — solution limiters
+#   6. post_step! (after each full time step, not RK substage) — solution limiters
 #
 # residual! dispatches only on AbstractCapturingMethod / these hooks —
 # never on concrete method type names (e.g. never PerssonAVMethod by name).
@@ -18,7 +18,7 @@ abstract type AbstractDissipationOperator end
 struct NullSensor <: AbstractShockSensor end
 struct NullDissipation <: AbstractDissipationOperator end
 
-"""Default method: identity hooks. Used from M1 onward."""
+"""Default method: identity hooks (no sensor or artificial viscosity)."""
 struct NullCapturing <: AbstractCapturingMethod
     sensor::NullSensor
     dissip::NullDissipation
@@ -86,7 +86,7 @@ function apply_dissipation!(du, method::AbstractCapturingMethod, σ, u_work, sta
     return du
 end
 
-"""Called after each full RK3 step (not substage) for solution limiting."""
+"""Called after each full time step (not RK substage) for solution limiting."""
 function post_step!(state, method::AbstractCapturingMethod, eq)
     return nothing
 end
@@ -112,7 +112,7 @@ function apply_dissipation!(du, ::NullDissipation, σ, u_work, state, eq)
 end
 
 # ---------------------------------------------------------------------------
-# Lightweight method registry (expanded in M6)
+# Method registry (inventable names; further methods via src/methods/Registry.jl)
 # ---------------------------------------------------------------------------
 
 const METHOD_REGISTRY = Dict{String,Function}(

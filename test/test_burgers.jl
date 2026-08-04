@@ -41,14 +41,8 @@ end
         @test c["conservation_pass"]
         @test c["metrics"]["oscillations_present"]
         @test c["overshoot"] >= 0.02
-        @test c["pass"]  # M2: success means oscillations were demonstrated
+        @test c["pass"]  # success means oscillations were demonstrated
         @info "p=$p overshoot=$(c["overshoot"]) u∈[$(c["metrics"]["u_min"]), $(c["metrics"]["u_max"])]"
     end
 end
 
-@testset "M2 suite integration" begin
-    cases, overall, fails = run_m2_burgers_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 6
-end

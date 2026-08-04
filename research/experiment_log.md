@@ -1,13 +1,15 @@
 # FRForge Experiment Log
 
 **Authority:** This file is the laboratory notebook and **authoritative memory** for agents and humans.  
-**Rule:** Always **read this log before proposing a new capturing method**. Prefer `frforge log summary` / `frontier` / `lessons` for a quick structured view. Append after every invent / robustness evaluation.
+**Rule:** Always **read this log before proposing a new capturing method**. Prefer `frforge log summary` / `frontier` / `lessons` for a quick structured view. Append after every invent / confirm / robustness evaluation.
 
 **Frozen invent scheme** (composite-score history): **GL + Rusanov + SSP-RK3** (`DEFAULT_SCHEME`).  
 Do not change defaults for invent comparisons without a **logged re-baseline** entry.  
 Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration only, not invent score history.
 
-**CI policy (one line):** Every addition declares **required CI** vs **full/nightly/manual**; required CI stays under ~10–15 min on Ubuntu; no large VTU/invent trees as PR artifacts.
+**Two-tier evaluation:** short-list on **coarse invent** → **fine-mesh confirm** (`frforge confirm`) → only then consider `publication_grade` or paper freeze with `snapshot freeze --require-confirm`. Confirm does **not** rewrite invent composite history. Invent/confirm-for-promotion always use the **serial residual**; threaded residuals are for local documentation only.
+
+**CI policy (one line):** Every addition declares **required CI** vs **full/nightly/manual**; required CI stays under ~10–15 min on Ubuntu; no large VTU/invent/confirm trees as PR artifacts.
 
 **Phase 3.1:** 2D Persson AV path on Cartesian quads (tensor-product modal sensor + BR0 AV). Suite: `frforge test --suite 2d_capturing` (CI-light).
 
@@ -21,7 +23,9 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 
 **Phase 5.1:** Experiment-log analytics — `frforge log summary|frontier|lessons|show` (read-only).
 
-**Phase 5.2:** Reproducibility snapshots — `frforge snapshot freeze|verify|tables` (freeze after short-list only).
+**Phase 5.2:** Reproducibility snapshots — `frforge snapshot freeze|verify|tables` (freeze after short-list + prefer confirm).
+
+**Confirm:** `frforge confirm --method …` — fine multi-D gate (Riemann cfg6, reduced DMR, vortex order); statuses `confirmed` / `confirmation_failed`.
 
 ---
 
@@ -34,17 +38,17 @@ Each entry uses the following fields (Markdown bullets under an `### id` heading
 | `id` | always | `YYYYMMDD-method_name-short` unique |
 | `date` | always | ISO-8601 |
 | `method` | always | Registry name |
-| `baseline` | invent runs | Usually `persson_av` |
-| `hypothesis` | **required if status ≥ promising** | Why try this |
+| `baseline` | invent/confirm runs | Usually `persson_av` |
+| `hypothesis` | **required if invent status ≥ promising** | Why try this |
 | `scheme.points` / `flux` / `time` | always | Defaults: GL / Rusanov / SSP-RK3 |
-| `metrics.*` | invent/score | composite, scores, `candidate_status` |
+| `metrics.*` | invent/score/confirm | composite, scores, `candidate_status` and/or `confirmation_status`, `mesh` |
 | `strengths` / `weaknesses` | recommended | |
-| `lessons` | **required if status ≥ promising** | Highest-value agent content |
-| `status` | always | `open` \| `shortlisted` \| `robustness_pending` \| `publication_grade` \| `archived` \| `baseline` |
+| `lessons` | **required if invent status ≥ promising** | Highest-value agent content |
+| `status` | always | `open` \| `shortlisted` \| `robustness_pending` \| `confirmed` \| `confirmation_failed` \| `publication_grade` \| `archived` \| `baseline` |
 | `artifacts` | when available | Paths to JSON reports |
 | `git_ref` | optional | SHA or branch |
 
-**Promotion / narrative rule:** Methods at `promising` or higher (`accepted_candidate`, `publication_grade`) must have non-empty **`hypothesis`** and **`lessons`** (not invent placeholders) before any publication-grade claim. Phase 2 robustness evidence is also required for `publication_grade`.
+**Promotion / narrative rule:** Methods at invent `promising` or higher must have non-empty **`hypothesis`** and **`lessons`**. **`publication_grade`** further requires robustness evidence **and** a fine-mesh **`confirmed`** entry (`frforge confirm` on frozen scheme). Use `frforge snapshot freeze --require-confirm` for paper-facing freezes.
 
 **Write policy:** Append-only (except typo fixes). Status changes = new entry or a dated status note under the entry.
 

@@ -1,4 +1,4 @@
-# Publication / reproducibility snapshots (Phase 5.2).
+# Publication / reproducibility snapshots.
 #
 # Freeze a method + reports + env lock into an immutable directory.
 # Default verify is cheap (hashes + manifest); --rerun for full invent.
@@ -75,10 +75,14 @@ end
 
 """
     freeze_snapshot(; method, baseline, method_report, baseline_report, compare,
-                     out_dir, git_ref, source_extra, log_path, append_log) -> String
+                     out_root, git_ref, source_extra, log_path, append_log,
+                     require_confirm, confirm_compare) -> String
 
 Create an immutable snapshot directory. Returns absolute path.
 Fails if zero source files resolve or if destination exists.
+
+`require_confirm=true` hard-fails unless fine-mesh confirm evidence exists
+(`frforge confirm` log entry or `confirm_compare` JSON). Default only warns.
 """
 function freeze_snapshot(;
     method::AbstractString,
@@ -92,10 +96,28 @@ function freeze_snapshot(;
     log_path::AbstractString=default_experiment_log_path(),
     append_log::Bool=true,
     date::Date=Dates.today(),
+    require_confirm::Bool=false,
+    confirm_compare::Union{Nothing,AbstractString}=nothing,
 )
     root = package_root()
     isfile(method_report) || error("method_report not found: $method_report")
     isfile(baseline_report) || error("baseline_report not found: $baseline_report")
+
+    conf_ok, conf_note = method_has_confirm_pass(
+        method;
+        log_path=log_path,
+        confirm_compare=confirm_compare,
+    )
+    if !conf_ok
+        msg = "Fine-mesh confirm not found for method=$method ($conf_note). " *
+              "Paper-facing freezes should run `frforge confirm` first, then " *
+              "`frforge snapshot freeze --require-confirm`."
+        if require_confirm
+            error(msg)
+        else
+            @warn msg
+        end
+    end
 
     sources = resolve_method_sources(method; extra=source_extra)
     # verify sources exist
@@ -203,11 +225,8 @@ function freeze_snapshot(;
             hashes[rel] = _file_sha256(p)
         end
     end
-    open(joinpath(snap_dir, "hashes.json"), "w") do io
-        JSON.print(io, hashes, 2)
-    end
-    # re-hash including hashes.json itself after write — store payload hashes only
-    # (hashes.json is the manifest of others)
+    # Store payload hashes only (hashes.json is the manifest of others).
+    write_json_pretty(joinpath(snap_dir, "hashes.json"), hashes)
 
     snap = Dict{String,Any}(
         "schema_version" => SNAPSHOT_SCHEMA_VERSION,
@@ -237,9 +256,7 @@ function freeze_snapshot(;
         ),
         "snapshot_dir" => snap_name,
     )
-    open(joinpath(snap_dir, "SNAPSHOT.json"), "w") do io
-        JSON.print(io, snap, 2)
-    end
+    write_json_pretty(joinpath(snap_dir, "SNAPSHOT.json"), snap)
 
     # filled README from template
     readme = _fill_reproduce_readme(snap, snap_dir)
@@ -302,7 +319,7 @@ function _fill_reproduce_readme(snap::AbstractDict, snap_dir::AbstractString)
         println(io, "- **", k, ":** ", v)
     end
     println(io)
-    println(io, "When to freeze: only after short-list / robustness look — not after every invent run.")
+    println(io, "When to freeze: after invent short-list + fine-mesh confirm (+ robustness) — not after every invent run.")
     return String(take!(io))
 end
 

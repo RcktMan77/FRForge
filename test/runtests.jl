@@ -23,6 +23,8 @@ using FRForge
     include("test_snapshot.jl")
     include("test_schemes.jl")
     include("test_robustness.jl")
+    include("test_confirm.jl")
+    include("test_threading.jl")
     include("test_vtk.jl")
     include("test_2d.jl")
 end

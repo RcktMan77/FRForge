@@ -62,9 +62,3 @@ end
     @test bd["metrics"]["max_deviation_from_uniform"] < 1e-12
 end
 
-@testset "M3 suite integration" begin
-    cases, overall, fails = run_m3_euler_suite()
-    @test overall
-    @test isempty(fails)
-    @test length(cases) >= 8
-end

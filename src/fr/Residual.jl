@@ -15,11 +15,14 @@ function _resolve_flux(eq, method, uL::AbstractVector, uR::AbstractVector, flux_
 end
 
 """
-    compute_interface_fluxes(traces, mesh, eq, method, t; flux_kind=:rusanov) -> InterfaceFluxes
+    compute_interface_fluxes!(ws, traces, mesh, eq, method, t; flux_kind=:rusanov) -> InterfaceFluxes
 
 Apply BC ghosts at domain ends and compute one numerical flux per interface.
+Writes into workspace face buffers (`ws.fL` / `ws.fR`). Prefer this over the
+allocating `compute_interface_fluxes` wrapper.
 """
-function compute_interface_fluxes(
+function compute_interface_fluxes!(
+    ws::ResidualWorkspace1D{T},
     traces::InterfaceTraces{T},
     mesh::Mesh1D{T},
     eq::AbstractEquation{Neq},
@@ -28,33 +31,36 @@ function compute_interface_fluxes(
     flux_kind::Symbol=:rusanov,
 ) where {T,Neq}
     Nel = mesh.n_elements
-    fL = zeros(T, Nel, Neq)
-    fR = zeros(T, Nel, Neq)
+    fL, fR = ws.fL, ws.fR
+    u_m, u_p = ws.u_m, ws.u_p
 
-    # Helper to get flux from left/right state vectors
-    function flux_at(u_minus::Vector{T}, u_plus::Vector{T})
+    function flux_at!(dest::AbstractVector{T}, u_minus::Vector{T}, u_plus::Vector{T})
         f = _resolve_flux(eq, method, u_minus, u_plus, flux_kind)
-        return f isa AbstractVector ? collect(T, f) : T[T(f)]
+        if f isa AbstractVector
+            @inbounds for c in 1:Neq
+                dest[c] = T(f[c])
+            end
+        else
+            dest[1] = T(f)
+        end
+        return dest
     end
+    ftmp = Vector{T}(undef, Neq)
 
     # Interior interfaces between e and e+1
     for e in 1:(Nel - 1)
-        u_m = Vector{T}(undef, Neq)
-        u_p = Vector{T}(undef, Neq)
         for c in 1:Neq
             u_m[c] = traces.uR[e, c]
             u_p[c] = traces.uL[e + 1, c]
         end
-        fhat = flux_at(u_m, u_p)
+        flux_at!(ftmp, u_m, u_p)
         for c in 1:Neq
-            fR[e, c] = fhat[c]
-            fL[e + 1, c] = fhat[c]
+            fR[e, c] = ftmp[c]
+            fL[e + 1, c] = ftmp[c]
         end
     end
 
     # Domain left interface (element 1 left)
-    u_m = Vector{T}(undef, Neq)
-    u_p = Vector{T}(undef, Neq)
     for c in 1:Neq
         u_p[c] = traces.uL[1, c]
     end
@@ -74,11 +80,11 @@ function compute_interface_fluxes(
     else
         error("Unknown left BC type: $(typeof(mesh.left_bc))")
     end
-    fhat_left = flux_at(u_m, u_p)
+    flux_at!(ftmp, u_m, u_p)
     for c in 1:Neq
-        fL[1, c] = fhat_left[c]
+        fL[1, c] = ftmp[c]
         if mesh.left_bc isa PeriodicBC
-            fR[Nel, c] = fhat_left[c]
+            fR[Nel, c] = ftmp[c]
         end
     end
 
@@ -99,13 +105,32 @@ function compute_interface_fluxes(
         else
             error("Unknown right BC type: $(typeof(mesh.right_bc))")
         end
-        fhat_right = flux_at(u_m, u_p)
+        flux_at!(ftmp, u_m, u_p)
         for c in 1:Neq
-            fR[Nel, c] = fhat_right[c]
+            fR[Nel, c] = ftmp[c]
         end
     end
 
     return InterfaceFluxes{T}(fL, fR)
+end
+
+"""
+    compute_interface_fluxes(traces, mesh, eq, method, t; flux_kind=:rusanov) -> InterfaceFluxes
+
+Allocating convenience wrapper (creates a temporary workspace). Prefer
+`compute_interface_fluxes!` from the residual path.
+"""
+function compute_interface_fluxes(
+    traces::InterfaceTraces{T},
+    mesh::Mesh1D{T},
+    eq::AbstractEquation{Neq},
+    method::AbstractCapturingMethod,
+    t::T;
+    flux_kind::Symbol=:rusanov,
+) where {T,Neq}
+    Nel = mesh.n_elements
+    ws = ResidualWorkspace1D(T, 1, Nel, Neq)  # Np unused for fluxes
+    return compute_interface_fluxes!(ws, traces, mesh, eq, method, t; flux_kind=flux_kind)
 end
 
 """Extrapolate discontinuous flux to left/right endpoints: sum_j f_j * ℓ_j(±1)."""
@@ -125,7 +150,8 @@ end
 """
     residual!(du, state, eq, method) -> du
 
-Strong-form 1D FR residual with staged capturing hooks (Appendix A).
+Strong-form 1D FR residual with staged capturing hooks (see design residual pipeline).
+Reuses `state` residual workspace (`u_work`, traces, interface fluxes, `σ`).
 """
 function residual!(
     du::AbstractArray{T,3},
@@ -136,13 +162,15 @@ function residual!(
     mesh, ops = state.mesh, state.ops
     Np, Nel, _ = size(state.u)
 
-    u_work = similar(state.u)
+    ws = ensure_residual_workspace!(state)
+    u_work = ws.u_work
     preprocess_state!(u_work, method, state, eq)
 
-    traces = allocate_traces(Nel, Neq, T)
+    traces = ws.traces
     extrapolate_interface!(traces, method, u_work, state, eq)
 
-    fhat = compute_interface_fluxes(
+    fhat = compute_interface_fluxes!(
+        ws,
         traces,
         mesh,
         eq,
@@ -159,7 +187,6 @@ function residual!(
         fR = extrapolate_flux(f, ops.ℓ_R)
         Je = mesh.J[e]
         for c in 1:Neq
-            # vol = D * f[:, c]
             for j in 1:Np
                 vol = zero(T)
                 for k in 1:Np
@@ -173,7 +200,7 @@ function residual!(
         end
     end
 
-    σ = zeros(T, Nel)
+    σ = ws.σ
     sense!(σ, method, u_work, state, eq)
     apply_dissipation!(du, method, σ, u_work, state, eq)
     return du

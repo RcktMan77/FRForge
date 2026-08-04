@@ -5,7 +5,7 @@
 #
 # Agents must read the log before proposing methods; invent appends after evaluation.
 
-"""Frozen invent scheme for composite-score history (Phase 2+)."""
+"""Frozen invent scheme for composite-score history (GL + Rusanov + SSP-RK3)."""
 const FROZEN_INVENT_SCHEME = (
     points = "GL",
     flux = "Rusanov",
@@ -186,6 +186,9 @@ function format_entry_markdown(entry::AbstractDict)
     println(io, "- **metrics:**")
     for k in (
         "candidate_status",
+        "confirmation_status",
+        "confirm_preset",
+        "mesh",
         "composite",
         "baseline_composite",
         "composite_margin",
@@ -195,6 +198,8 @@ function format_entry_markdown(entry::AbstractDict)
         "robustness",
         "tradeoff_ok",
         "tradeoff_notes",
+        "method_overall_pass",
+        "baseline_overall_pass",
     )
         if haskey(metrics, k) && metrics[k] !== nothing
             println(io, "  - ", k, ": ", metrics[k])
