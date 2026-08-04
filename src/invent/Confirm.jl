@@ -653,43 +653,41 @@ function confirm_method(
         print_confirm_summary(method_name, cmp)
         print_report_trio(met_path, bas_path, cmp_path)
 
-        if append_log
-            lp = something(log_path, default_experiment_log_path())
-            yp = yaml_path === nothing ? default_experiment_log_yaml_path() : yaml_path
-            yp_use = (yp isa AbstractString && isempty(yp)) ? nothing : yp
-            arts = Dict{String,Any}(
-                "method_report" => met_path,
-                "baseline_report" => bas_path,
-                "compare" => cmp_path,
-            )
-            if write_vtk && vtk_dir !== nothing
-                arts["vtu_dir"] = vtk_dir
-            end
-            entry = entry_from_confirm(
-                method_name,
-                met,
-                bas,
-                cmp;
-                hypothesis = hypothesis,
-                lessons = lessons,
-                strengths = strengths,
-                weaknesses = weaknesses,
-                scheme = scheme,
-                git_ref = git_ref,
-                artifacts = arts,
-                preset = preset,
-            )
-            if !official
-                entry["status"] = "confirmation_failed"
-                entry["metrics"]["confirmation_status"] = "confirmation_failed"
-                entry["metrics"]["informational_threaded"] = true
-                entry["lessons"] =
-                    "Threaded confirm only — re-run serial confirm before promotion. " *
-                    string(get(entry, "lessons", ""))
-            end
-            append_experiment_entry!(entry; path = lp, yaml_path = yp_use)
-            println("Experiment log appended: $(entry["id"])  →  $lp")
-        end
+        maybe_append_workflow_log!(;
+            append_log=append_log,
+            log_path=log_path,
+            yaml_path=yaml_path,
+            entry_builder=function (lp, yp)
+                arts = report_artifact_dict(met_path, bas_path, cmp_path)
+                if write_vtk && vtk_dir !== nothing
+                    arts["vtu_dir"] = vtk_dir
+                end
+                entry = entry_from_confirm(
+                    method_name,
+                    met,
+                    bas,
+                    cmp;
+                    hypothesis=hypothesis,
+                    lessons=lessons,
+                    strengths=strengths,
+                    weaknesses=weaknesses,
+                    scheme=scheme,
+                    git_ref=git_ref,
+                    artifacts=arts,
+                    preset=preset,
+                )
+                if !official
+                    entry["status"] = "confirmation_failed"
+                    entry["metrics"]["confirmation_status"] = "confirmation_failed"
+                    entry["metrics"]["informational_threaded"] = true
+                    entry["lessons"] =
+                        "Threaded confirm only — re-run serial confirm before promotion. " *
+                        string(get(entry, "lessons", ""))
+                end
+                append_experiment_entry!(entry; path=lp, yaml_path=yp)
+                return entry
+            end,
+        )
 
         return met, bas, cmp
     end

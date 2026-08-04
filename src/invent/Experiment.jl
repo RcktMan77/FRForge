@@ -141,3 +141,57 @@ function print_report_trio(met_path, bas_path, cmp_path)
     println("         $cmp_path")
     return nothing
 end
+
+"""
+    resolve_log_paths(log_path, yaml_path) -> (log_path, yaml_path_or_nothing)
+
+Default experiment-log paths; empty-string `yaml_path` disables the YAML index.
+"""
+function resolve_log_paths(log_path, yaml_path)
+    lp = something(log_path, default_experiment_log_path())
+    yp = yaml_path === nothing ? default_experiment_log_yaml_path() : yaml_path
+    yp_use = (yp isa AbstractString && isempty(yp)) ? nothing : yp
+    return lp, yp_use
+end
+
+"""
+    report_artifact_dict(met_path, bas_path, cmp_path; extra...) -> Dict
+
+Standard invent/confirm artifact map for experiment-log entries.
+"""
+function report_artifact_dict(met_path, bas_path, cmp_path; extra::AbstractDict=Dict{String,Any}())
+    arts = Dict{String,Any}(
+        "method_report" => met_path,
+        "baseline_report" => bas_path,
+        "compare" => cmp_path,
+    )
+    for (k, v) in pairs(extra)
+        arts[String(k)] = v
+    end
+    return arts
+end
+
+"""
+    maybe_append_workflow_log!(; append_log, entry_builder, log_path, yaml_path) -> entry|nothing
+
+Call `entry_builder(log_path, yaml_path)` when `append_log` is true, print the
+appended id, and warn on incomplete narrative when present.
+`entry_builder` should return the entry dict (with optional `narrative_complete`).
+"""
+function maybe_append_workflow_log!(;
+    append_log::Bool,
+    entry_builder::Function,
+    log_path=nothing,
+    yaml_path=nothing,
+)
+    append_log || return nothing
+    lp, yp = resolve_log_paths(log_path, yaml_path)
+    entry = entry_builder(lp, yp)
+    println("Experiment log appended: $(entry["id"])  →  $lp")
+    if get(entry, "narrative_complete", true) === false
+        println(
+            "  WARNING: hypothesis/lessons are placeholders — required for promising+ before shortlist.",
+        )
+    end
+    return entry
+end

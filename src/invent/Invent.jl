@@ -31,37 +31,25 @@ function _invent_append_if_requested!(
     weaknesses,
     git_ref,
 )
-    append_log || return nothing
-    lp = something(log_path, default_experiment_log_path())
-    yp = yaml_path === nothing ? default_experiment_log_yaml_path() : yaml_path
-    # empty string yaml_path disables YAML index update
-    yp_use = (yp isa AbstractString && isempty(yp)) ? nothing : yp
-    arts = Dict{String,Any}(
-        "method_report" => met_path,
-        "baseline_report" => bas_path,
-        "compare" => cmp_path,
+    return maybe_append_workflow_log!(;
+        append_log=append_log,
+        log_path=log_path,
+        yaml_path=yaml_path,
+        entry_builder=(lp, yp) -> invent_append_log!(
+            method_name,
+            met,
+            bas,
+            cmp;
+            log_path=lp,
+            yaml_path=yp,
+            artifacts=report_artifact_dict(met_path, bas_path, cmp_path),
+            hypothesis=hypothesis,
+            lessons=lessons,
+            strengths=strengths,
+            weaknesses=weaknesses,
+            git_ref=git_ref,
+        ),
     )
-    entry = invent_append_log!(
-        method_name,
-        met,
-        bas,
-        cmp;
-        log_path = lp,
-        yaml_path = yp_use,
-        artifacts = arts,
-        hypothesis = hypothesis,
-        lessons = lessons,
-        strengths = strengths,
-        weaknesses = weaknesses,
-        git_ref = git_ref,
-    )
-    println("Experiment log appended: $(entry["id"])  →  $lp")
-    if get(entry, "narrative_complete", true) === false
-        println(
-            "  WARNING: hypothesis/lessons are placeholders — required for promising+ before shortlist.",
-        )
-    end
-    return entry
 end
 
 """

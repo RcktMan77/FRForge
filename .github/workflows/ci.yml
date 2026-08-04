@@ -11,8 +11,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detect whether this event touches package code (vs docs/assets only).
+  changes:
+    name: Change detection
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        # On push to main/develop, always treat as code so full suite runs.
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'test/**'
+              - 'Project.toml'
+              - 'Manifest.toml'
+              - 'bin/**'
+              - '.github/workflows/**'
+              - 'scripts/**/*.jl'
+      - name: Force full suite on push
+        if: github.event_name == 'push'
+        id: filter
+        run: echo "code=true" >> "$GITHUB_OUTPUT"
+
+  # Required check names stay "Julia 1.10/1.11 - ubuntu-latest" for branch protection.
+  # Docs-only PRs run a package-load smoke under the same job names.
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    needs: changes
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -30,9 +60,12 @@ jobs:
 
       - uses: julia-actions/julia-buildpkg@v1
 
-      - uses: julia-actions/julia-runtest@v1
+      - name: Full Pkg.test (code paths)
+        if: needs.changes.outputs.code == 'true'
+        uses: julia-actions/julia-runtest@v1
 
-      - name: CLI smoke (JSON report skeleton)
+      - name: CLI smoke (code paths)
+        if: needs.changes.outputs.code == 'true'
         run: |
           chmod +x bin/frforge
           ./bin/frforge test --report results/ci/report.json --suite smoke
@@ -44,3 +77,8 @@ jobs:
             isempty(errs) || error(join(errs, "; "))
             println("CLI report OK: schema_version=", r["schema_version"])
           '
+
+      - name: Package load smoke (docs-only PR)
+        if: needs.changes.outputs.code != 'true'
+        run: |
+          julia --project=. -e 'using FRForge; println("docs-only CI smoke OK schema=", FRForge.SCHEMA_VERSION)'
