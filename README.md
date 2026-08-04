@@ -53,24 +53,24 @@ High-order FR/DG schemes shine in smooth flow and struggle at shocks. FRForge tr
 | **Invent scheme** | Frozen **GL + Rusanov + SSP-RK3** so composites stay comparable |
 | **CI** | Ubuntu · Julia 1.10 / 1.11 · light suites (~10–15 min) |
 
-<!-- Avoid $ math inside raw HTML: GitHub does not run KaTeX reliably there. -->
+<!-- No $ math. Do not nest <sub> (breaks g<sub>DG</sub>). Avoid bare g_DG in Markdown (_ starts emphasis). -->
 <table>
   <tr>
     <td width="25%" align="center" valign="top">
       <strong>FR core</strong><br />
-      <sub>GL/GLL points, g<sub>DG</sub>, Rusanov/HLLC, SSP-RK</sub>
+      <small>GL/GLL points, g<sub>DG</sub>, Rusanov/HLLC, SSP-RK</small>
     </td>
     <td width="25%" align="center" valign="top">
       <strong>Hooks</strong><br />
-      <sub>Sense, dissipate, limit—without forking the residual</sub>
+      <small>Sense, dissipate, limit—without forking the residual</small>
     </td>
     <td width="25%" align="center" valign="top">
       <strong>Scores</strong><br />
-      <sub>Order · dissipation · shock · robustness → composite</sub>
+      <small>Order · dissipation · shock · robustness → composite</small>
     </td>
     <td width="25%" align="center" valign="top">
       <strong>Lab memory</strong><br />
-      <sub>Experiment log · confirm · snapshots</sub>
+      <small>Experiment log · confirm · snapshots</small>
     </td>
   </tr>
 </table>
@@ -96,7 +96,7 @@ What is still scarce is a **systematic laboratory**: a fixed high-order FR discr
 
 ## Approach
 
-1. **Green-field FR core** — Solution points, g_DG correction, interface fluxes, and SSP-RK in pure Julia (no external FR library dependency).
+1. **Green-field FR core** — Solution points, g<sub>DG</sub> correction, interface fluxes, and SSP-RK in pure Julia (no external FR library dependency).
 2. **Pluggable capturing** — Hooks: `preprocess_state!`, interface extrapolation, optional flux override, `sense!`, `apply_dissipation!`, `post_step!`. New methods are real code under `src/methods/`.
 3. **Quantitative scoring** — Versioned JSON reports; invent classifies candidates against `persson_av`.
 4. **Laboratory loop** — Experiment log, frontier analytics, fine-mesh `confirm`, reproducibility snapshots. Invent scheme stays frozen unless a re-baseline is logged.
@@ -114,11 +114,11 @@ FRForge uses **Flux Reconstruction** on tensor-product elements (1D; 2D quads, o
 | Axis | Default (invent / scoring) | Also available |
 |------|----------------------------|----------------|
 | Solution points | **Gauss–Legendre (GL)** | Gauss–Lobatto–Legendre (GLL) |
-| Correction | Huynh **g_DG** (Legendre/Radau) | fixed (not a scheme axis) |
+| Correction | Huynh **g<sub>DG</sub>** (Legendre/Radau) | — (core fixed) |
 | Interface flux | **Rusanov** (local Lax–Friedrichs) | **HLLC** (Euler) |
 | Time | **SSP-RK3** | SSP-RK2 |
 
-On GL nodes with **g_DG**, the scheme recovers a DG-equivalent FR formulation (Huynh). GLL / HLLC / SSP-RK2 are for **robustness and exploration**; invent composite history stays on **GL + Rusanov + SSP-RK3**.
+On GL nodes with **g<sub>DG</sub>**, the scheme recovers a DG-equivalent FR formulation (Huynh). GLL / HLLC / SSP-RK2 are for **robustness and exploration**; invent composite history stays on **GL + Rusanov + SSP-RK3**.
 
 **References:** Huynh (AIAA 2007-4079); Vincent–Castonguay–Jameson (energy-stable FR); Rusanov; Toro (HLLC); Gottlieb–Shu (SSP-RK).
 
