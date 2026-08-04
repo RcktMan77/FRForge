@@ -57,6 +57,11 @@ def parse_args(argv=None):
         action="store_true",
         help="Skip HO tessellation (debug)",
     )
+    p.add_argument(
+        "--colorbar",
+        action="store_true",
+        help="Show scalar bars (default: off for tight README crops; ranges print to stdout)",
+    )
     return p.parse_args(argv)
 
 
@@ -641,7 +646,7 @@ def main(argv=None):
         ("POINTS", "p"),
         ["Cool to Warm", "Viridis (matplotlib)", "Blue to Red Rainbow"],
         rng=prange,
-        show_bar=True,
+        show_bar=args.colorbar,
     )
     _tight_camera(view, bounds, (width, height), margin=0.02)
     _save(view, os.path.join(outdir, "%s_pressure.png" % prefix), width, height, args.res)
@@ -715,7 +720,7 @@ def main(argv=None):
             ("POINTS", "schlieren"),
             ["Grayscale", "X Ray"],
             rng=(lo, hi),
-            show_bar=True,
+            show_bar=args.colorbar,
             schlieren_white_to_black=True,
         )
         _tight_camera(view, bounds, (width, height), margin=0.02)
@@ -772,7 +777,7 @@ def main(argv=None):
             (assoc, field),
             ["Plasma (matplotlib)", "Cool to Warm", "Rainbow Desaturated"],
             rng=srange,
-            show_bar=True,
+            show_bar=args.colorbar,
         )
         _tight_camera(view, bounds, (width, height), margin=0.02)
         _save(
