@@ -36,7 +36,9 @@ Full design blueprint: [`docs/design.md`](docs/design.md).
 | **Completed** | **Phase 2** (experiment log · schemes · robustness matrix) |
 | **In progress** | **Phase 3** — Scientific & geometric extensions |
 | **Completed** | **P3.1** Richer 2D capturing |
-| Next | **P3.2** Curved elements |
+| **Completed** | **P3.2** Curved elements |
+| **Completed** | **P3.3a** 2D Riemann + isentropic vortex |
+| Next | **P3.3b** Optional DMR/FFS (reduced) → **P4** Performance |
 
 ### Milestone roadmap (M0–M8 complete)
 

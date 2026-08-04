@@ -13,6 +13,8 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 
 **Phase 3.2:** Curved isoparametric quads + metric residual; free-stream preservation merge gate. Suite: `frforge test --suite curved`.
 
+**Phase 3.3a:** Core multi-D benchmarks (CI-light): isentropic vortex order + 2D Riemann cfg3. Suite: `frforge test --suite benchmarks`.
+
 ---
 
 ## Schema

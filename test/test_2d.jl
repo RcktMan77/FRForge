@@ -188,3 +188,59 @@ end
     @test isempty(fails)
     @test length(cases) >= 3
 end
+
+@testset "P3.3a isentropic vortex IC + short residual" begin
+    eq = Euler2D(1.4)
+    ρc, uc, vc, pc = isentropic_vortex_primitives(5.0, 5.0, 0.0)
+    @test ρc > 0 && pc > 0 && ρc < 1.0  # core cooler/denser drop
+    ρf, _, _, pf = isentropic_vortex_primitives(0.0, 0.0, 0.0)
+    @test isapprox(ρf, 1.0; rtol=1e-8) && isapprox(pf, 1.0; rtol=1e-8)
+    ops = build_operators(2)
+    mesh = Mesh2D(0.0, 10.0, 0.0, 10.0, 4, 4)
+    state = allocate_state(mesh, ops, Val(4))
+    set_initial_condition!(
+        state,
+        (x, y) -> begin
+            ρi, ui, vi, pi = isentropic_vortex_primitives(x, y, 0.0)
+            primitives_to_conserved(eq, ρi, ui, vi, pi)
+        end,
+    )
+    du = similar(state.u)
+    residual!(du, state, eq, NullCapturing())
+    @test all(isfinite, du)
+    @test positivity_ok(eq, state)
+end
+
+@testset "P3.3a isentropic vortex order CI-light" begin
+    c = run_isentropic_vortex_order(; p=2, n_list=[8, 16], t_final=0.5, cfl=0.08)
+    @test !c["diverged"]
+    @test c["positivity_ok"]
+    @test c["conservation_pass"]
+    @test c["order_pass"]
+    @info "vortex orders=$(c["observed_orders"]) L2=$(c["l2_errors"])"
+end
+
+@testset "P3.3a 2D Riemann cfg6 CI-light" begin
+    c, state, eq = run_euler2d_riemann(;
+        p=1,
+        nx=16,
+        ny=16,
+        t_final=0.08,
+        cfl=0.08,
+        config=:cfg6,
+        method=PerssonAVMethod(; c_av=0.1),
+        method_name="persson_av",
+    )
+    @test c["pass"]
+    @test c["positivity_ok"]
+    @test !c["diverged"]
+    @test positivity_ok(eq, state)
+    @test c["metrics"]["config"] == "cfg6"
+end
+
+@testset "P3.3a benchmark suite" begin
+    cases, overall, fails = run_p33a_benchmark_suite()
+    @test overall
+    @test isempty(fails)
+    @test length(cases) >= 3
+end

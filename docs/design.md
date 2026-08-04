@@ -1255,6 +1255,21 @@ Tensor-product Cartesian FR residual runs the same staged hooks as 1D:
 - **CI tier:** `run_p31_2d_capturing_suite` / `frforge test --suite 2d_capturing` uses reduced meshes; full Double Mach etc. deferred to later Phase 3.
 - Residual still never hard-wires method type names.
 
+### 2D benchmarks (Phase 3.3a+)
+
+Core multi-D gates (required CI, light configs only):
+
+| Case | Role | CI config |
+|------|------|-----------|
+| Isentropic vortex order | Exact smooth Euler (MMS-style); NullCapturing | `p=2`, `n∈{8,16}`, `t=0.5`, `L=10` |
+| 2D Riemann (Lax–Liu **cfg 6**) | Multi-wave contacts/shears (positivity-friendly) | `p=1`, `16²`, `t=0.08`, Persson AV |
+
+CLI: `frforge test --suite benchmarks` / `p33a` → `run_p33a_benchmark_suite`.
+
+**Note:** Strong cfg 3 (`config=:cfg3`) is available for research/full runs; on coarse HO meshes it often loses pressure positivity without heavier AV — not a required-CI gate.
+
+**Optional / reduced (P3.3b, not Phase 3 gates):** Double Mach reflection, forward-facing step — full/nightly only when present.
+
 ### Robustness matrix (Phase 2.3+)
 
 Re-evaluate short-listed methods across scheme axes before any publication-grade claim.
