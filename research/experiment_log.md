@@ -11,6 +11,8 @@ Configurable axes (P2.2): GLL, HLLC, SSP-RK2 — for robustness / exploration on
 
 **Phase 3.1:** 2D Persson AV path on Cartesian quads (tensor-product modal sensor + BR0 AV). Suite: `frforge test --suite 2d_capturing` (CI-light).
 
+**Phase 3.2:** Curved isoparametric quads + metric residual; free-stream preservation merge gate. Suite: `frforge test --suite curved`.
+
 ---
 
 ## Schema

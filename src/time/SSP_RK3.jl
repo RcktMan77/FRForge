@@ -113,11 +113,11 @@ end
 # --- 2D variants (same Shu–Osher stages) ---
 
 function compute_dt(state::SolutionState2D{T}, eq; cfl::Real=0.2) where {T}
-    mesh, ops = state.mesh, state.ops
+    ops = state.ops
     p = ops.p
     λ = max_wave_speed(eq, state.u)
     λ = max(λ, eps(T))
-    hmin = min(minimum(mesh.Δx), minimum(mesh.Δy))
+    hmin = minimum(state.metrics.h_char)
     return T(cfl) * hmin / (T(2p + 1) * T(λ))
 end
 
